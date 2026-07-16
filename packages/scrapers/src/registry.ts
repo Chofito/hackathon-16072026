@@ -1,12 +1,16 @@
 // Registro de scrapers por tienda. El collector itera este mapa secuencialmente.
-// A medida que el dev de scrapers implemente cada tienda, se agrega aqui.
 
 import type { Scraper } from './types.ts'
+import { curacaoScraper } from './stores/curacao.ts'
+import { kemikScraper } from './stores/kemik.ts'
 import { maxScraper } from './stores/max.ts'
+import { pacifikoScraper } from './stores/pacifiko.ts'
 
 export const scrapers: Record<string, Scraper> = {
   [maxScraper.key]: maxScraper,
-  // TODO(dev-scrapers): kemik, pacifiko, curacao
+  [kemikScraper.key]: kemikScraper,
+  [pacifikoScraper.key]: pacifikoScraper,
+  [curacaoScraper.key]: curacaoScraper,
 }
 
 export function getScraper(key: string): Scraper | undefined {

@@ -19,6 +19,7 @@
     "fn:serve": "bunx supabase functions serve fetch-product --no-verify-jwt",
     "fn:deploy": "bunx supabase functions deploy fetch-product",
     "poc": "bun run poc/find-matches.ts",
+    "examples": "bun run scripts/capture-examples.ts",
     "typecheck": "bun run --filter '*' typecheck"
   },
   "devDependencies": {
