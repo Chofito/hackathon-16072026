@@ -4,6 +4,15 @@
 > Contiene contexto, decisiones tomadas, alternativas descartadas y próximos pasos.
 > Pensado para retomarse en otro harness (Claude Code u otro agente) sin contexto previo.
 
+## Estado del documento
+
+Este brainstorm fue refinado el 2026-07-16 con decisiones ya tomadas (ver sección 8). La fuente de verdad del diseño vive en `docs/`:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura y componentes
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — entidades y esquema de datos
+- [docs/SCRAPING.md](docs/SCRAPING.md) — tácticas de colección y matching
+- [docs/TASKS.md](docs/TASKS.md) — backlog por fases
+
 ---
 
 ## 1. Resumen ejecutivo
@@ -28,20 +37,20 @@ Construir el **dataset histórico de precios del ecommerce guatemalteco** (MAX, 
 ## 3. Alcance inicial (MVP)
 
 - **Nicho vertical:** tech/gaming (~300 SKUs de alto interés: consolas, GPUs, celulares).
-- **Tiendas:** MAX, Kemik, Pacifiko, Curacao + 1 adicional (5 total).
+- **Tiendas:** MAX, Kemik, Pacifiko, Curacao (4 total). La quinta tienda queda descartada por ahora — El Duende ya no existe; se re-evaluará cuando el colector esté estable.
 - **Frecuencia de captura:** cada 6–12 horas (suficiente para histórico de precios).
-- **Alertas MVP:** Telegram (costo cero); migrar a WhatsApp Business API cuando haya tracción.
+- **Alertas MVP:** fuera del alcance de implementación. Se documenta una capa de notificaciones agnóstica al canal (mensajería, correo, notificaciones del navegador) para implementarse después.
 
 ## 4. Arquitectura recomendada
 
 **Opción elegida: colector cloud ligero + Postgres gestionado desde el día uno.**
 
-Pipeline de cinco piezas: **colección → normalización/matching → almacenamiento temporal → alertas → producto (web/API)**.
+Pipeline de cinco piezas: **colección → normalización/matching → almacenamiento temporal → notificaciones → producto (web/API)**.
 
-- **Colección:** scrapers en Python o TypeScript ejecutados como jobs programados (GitHub Actions cron, o mini PC propio como worker). Desacoplados del producto: el dataset crece aunque el frontend no exista.
-- **Almacenamiento:** Postgres gestionado (Neon o Supabase, free tier). Serie de tiempo simple: tabla `price_points` con índices adecuados llega lejos antes de necesitar TimescaleDB.
-- **Producto (fase posterior):** Next.js (frontend) + NestJS (API) — stack ya dominado por el autor.
-- **Migración futura:** todo lo anterior migra sin rehacer datos a una plataforma event-driven (NestJS + BullMQ + Redis + Timescale + multi-tenancy) cuando el SaaS tenga clientes.
+- **Colección:** scrapers en TypeScript + Bun ejecutados como scripts cron simples y secuenciales (GitHub Actions cron o Vercel Cron), sin colas ni workers. Desacoplados del producto: el dataset crece aunque el frontend no exista.
+- **Almacenamiento:** Supabase (Postgres gestionado, free tier). Serie de tiempo simple: tabla `price_points` con índices adecuados llega lejos antes de necesitar TimescaleDB.
+- **Producto (fase posterior):** Next.js hosteado en Vercel, cubriendo frontend (SSR) y API (route handlers). Sin backend NestJS separado.
+- **Migración futura:** todo lo anterior migra sin rehacer datos a una plataforma event-driven (colas + workers + Timescale + multi-tenancy) cuando el SaaS tenga clientes B2B.
 
 ### Esquema de datos mínimo
 
@@ -51,11 +60,12 @@ products        (id, canonical_name, brand, model, ean_gtin, category, ...)   --
 store_products  (id, store_id, product_id, store_sku, url, raw_name, ...)     -- mapeo tienda→canónico
 price_points    (id, store_product_id, price, list_price, currency,
                  in_stock, captured_at)                                        -- serie de tiempo
-alerts          (id, user_id, product_id, target_price, channel, active, ...)
-users           (id, email/telegram_id, ...)
+subscriptions   (id, user_id, product_id, target_price, active, ...)           -- suscripción a alertas
+notification_channels (id, user_id, type, address, verified, ...)              -- canal: mensajería/email/web push
+users           (id, email, ...)
 ```
 
-Índice clave: `price_points (store_product_id, captured_at DESC)`.
+Índice clave: `price_points (store_product_id, captured_at DESC)`. Detalle completo en [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
 
 ### Tácticas de colección (en orden de preferencia)
 
@@ -70,7 +80,7 @@ users           (id, email/telegram_id, ...)
 1. Cron (6–12 h) → scraper por tienda lee sitemap + JSON-LD → inserta `price_points` crudos.
 2. Normalizador hace matching contra `products` (catálogo canónico); discrepancias van a cola de revisión.
 3. API expone: precio actual, histórico, y señal "¿es buena oferta?" (percentil del precio actual vs. su histórico).
-4. Usuario suscribe alerta (producto + precio objetivo) → job evalúa en cada ingesta → notifica por Telegram/WhatsApp.
+4. Usuario suscribe alerta (producto + precio objetivo) → job evalúa en cada ingesta → notifica por el canal configurado (mensajería, correo o web push; fase posterior).
 5. Fase SaaS: dashboards agregados por categoría/marca/tienda sobre el mismo dataset.
 
 ## 6. Edge cases y modos de falla
@@ -92,20 +102,28 @@ users           (id, email/telegram_id, ...)
 | Watchdog viral de ofertas falsas como producto principal | Requiere meses de histórico previo; queda como feature/campaña derivada del dataset |
 | Crowdsourcing de precios (extensión/comunidad) | Frío de arrancar sin masa crítica; posible complemento futuro |
 
-## 8. Preguntas abiertas
+## 8. Decisiones tomadas (antes "Preguntas abiertas")
 
-- ¿Telegram o WhatsApp Business API para el MVP de alertas? (costo por conversación vs. adopción local)
-- ¿Curación manual del catálogo canónico al inicio, o inversión temprana en matching automático?
+Resueltas en la sesión de refinamiento del 2026-07-16:
+
+- **Canal de alertas:** ninguno por ahora. Se documenta una capa de notificaciones agnóstica al canal (mensajería tipo Telegram/WhatsApp, correo, web push); la implementación queda diferida.
+- **Matching:** curación manual del catálogo canónico (~300 SKUs) + EAN/GTIN cuando exista. Automatización (normalización, fuzzy/embeddings) solo cuando duela.
+- **Stack del colector:** TypeScript + Bun, scripts cron secuenciales sin colas ni workers — prioridad en velocidad de tener algo demostrable.
+- **Backend/producto:** Next.js (SSR + API routes) en Vercel + Supabase (Postgres gestionado, auth). Sin NestJS separado.
+- **Quinta tienda:** descartada por ahora (El Duende ya no existe). Foco en MAX, Kemik, Pacifiko y Curacao; se re-evaluará en fase SaaS.
+
+Sigue abierta:
+
 - ¿Términos con el empleador por escrito? (bloqueante para lanzamiento público, no para el prototipo privado)
-- ¿Quinta tienda a incluir? (candidatas: Intelaf, Tecnofácil, El Duende, Cemaco según nicho)
 
 ## 9. Próximos pasos
 
-- [ ] **Reconocimiento técnico (1 tarde):** verificar qué expone cada tienda — JSON-LD, sitemap.xml, feed de Merchant Center, robots.txt, protección Cloudflare.
-- [ ] **Esquema Postgres mínimo** (`stores`, `products`, `store_products`, `price_points`, `alerts`, `users`) en Neon/Supabase.
-- [ ] **Scraper de 1 tienda + 20 SKUs** corriendo en cron este fin de semana; validar robustez de JSON-LD.
+El backlog completo por fases vive en [docs/TASKS.md](docs/TASKS.md). Resumen inmediato:
+
+- [ ] **Reconocimiento técnico (1 tarde):** verificar qué expone cada una de las 4 tiendas — JSON-LD, sitemap.xml, feed de Merchant Center, robots.txt, protección Cloudflare.
+- [ ] **Esquema Postgres mínimo** (`stores`, `products`, `store_products`, `price_points`, `subscriptions`, `users`) en Supabase.
+- [ ] **Scraper de 1 tienda + 20 SKUs** corriendo en cron simple; validar robustez de JSON-LD.
 - [ ] **Conversación con el empleador** sobre el proyecto (antes de hacerlo público).
-- [ ] Definir canal de alertas del MVP (Telegram recomendado para empezar).
 
 ---
 
