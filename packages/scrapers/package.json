@@ -1,0 +1,17 @@
+{
+  "name": "@pgt/scrapers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./stores/*": "./src/stores/*.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pgt/core": "workspace:*"
+  }
+}

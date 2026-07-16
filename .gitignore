@@ -176,6 +176,14 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/node,macos
 
+### Supabase ###
+supabase/.branches
+supabase/.temp
+supabase/.env
+
+### Turbo / build caches ###
+.turbo
+
 # POC de scraping: salida y cache local de HTML/sitemaps
 poc-report.json
 .cache/

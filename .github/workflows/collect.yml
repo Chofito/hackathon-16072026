@@ -1,0 +1,28 @@
+# Cron del collector — FASE POSTERIOR (documentado, desactivado por ahora).
+# Para la hackathon el ciclo corre local (`bun run collect`).
+# Cuando se active: descomentar el bloque `schedule` y configurar los secrets
+# SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el repo.
+
+name: collect
+
+on:
+  workflow_dispatch: {}
+  # schedule:
+  #   - cron: '0 */8 * * *' # cada 8 horas (docs/SCRAPING.md: cada 6-12h)
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    # Desactivado hasta que el collector este listo para produccion.
+    if: ${{ false }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run collect
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SCRAPER_USER_AGENT: ${{ vars.SCRAPER_USER_AGENT }}
