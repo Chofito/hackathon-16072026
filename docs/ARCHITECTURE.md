@@ -17,13 +17,15 @@ Pipeline de cinco piezas: **colección → normalización/matching → almacenam
 
 ```mermaid
 flowchart TB
-    subgraph coleccion [Colección - Bun + TypeScript]
-        cron[Cron 6-12h<br/>GitHub Actions o Vercel Cron]
+    subgraph coleccion [Colección - colector Bun + Edge Function Deno]
+        cron[Cron 6-12h Bun<br/>+ Edge Function on-demand Deno]
         scraperMax[Scraper MAX]
         scraperKemik[Scraper Kemik]
         scraperPacifiko[Scraper Pacifiko]
         scraperCuracao[Scraper Curacao]
+        amazonRef[Referencia Amazon<br/>PA-API, USD]
         cron --> scraperMax --> scraperKemik --> scraperPacifiko --> scraperCuracao
+        cron --> amazonRef
     end
 
     subgraph normalizacion [Normalización y matching]
@@ -60,10 +62,13 @@ flowchart TB
 
 ### 3.1 Colector (scrapers)
 
-- **Stack:** TypeScript + Bun. Un script por tienda con una interfaz común (`scrape(store): PricePoint[]`).
-- **Ejecución:** cron cada 6–12 horas. Los 4 scrapers corren **secuencialmente** en un solo job — sin colas (RabbitMQ/BullMQ), sin workers, sin paralelismo. Con ~300 SKUs y 4 tiendas el volumen no lo justifica.
-- **Hosting del cron:** GitHub Actions cron (gratis, logs incluidos) o Vercel Cron. GitHub Actions es la opción por defecto: los jobs pueden durar más y los logs quedan versionados junto al código.
-- **Salida:** inserta filas crudas en `price_points` vía cliente de Supabase. No transforma más allá de parsear el JSON-LD.
+- **Stack:** **monorepo Bun** (TypeScript ESM). El colector recurrente es `apps/collector` (Bun); la lógica de fetch/parseo vive en `@pgt/core` **runtime-agnóstica** (`fetch` estándar, sin `Bun.*`) para reutilizarse también desde la Edge Function Deno. Módulo por tienda en `@pgt/scrapers` con interfaz común `scrape` (batch) + `fetchOne` (on-demand). Detalle en [SCRAPING.md](SCRAPING.md) §6 y [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md).
+- **Ejecución:** dos caminos sobre la misma lógica de captura, en distinto runtime:
+  - **Batch programado (Bun):** cron (GitHub Actions) o corrida local cada 6–12 horas; los 4 scrapers corren **secuencialmente** en `apps/collector` — sin colas, sin workers, sin paralelismo.
+  - **On-demand (Deno):** el usuario agrega un producto por URL/SKU; la Edge Function `fetch-product` captura ese producto individual y **encola** el resto de tiendas en `product_requests` para que el colector complete el tracking.
+- **Referencia Amazon:** además de las 4 tiendas locales, un colector de referencia consulta Amazon (EE.UU.) **por API oficial (PA-API), nunca scraping** y guarda precios en USD como ancla comparativa (`stores.kind = 'reference'`). No entra al ranking de precio local. Detalle en [SCRAPING.md](SCRAPING.md) §4.
+- **Salida:** `@pgt/ingest` inserta filas crudas en `price_points` vía `@pgt/db` (Supabase). No transforma más allá de parsear el JSON-LD/HTML.
+- **Local:** todo corre en la máquina del operador: `bun run collect` (colector), `bun run db:start`/`db:reset` (Supabase local) y `bun run fn:serve` (Edge Function en Deno).
 - **Errores:** cualquier scraper que no logre extraer datos (challenge, HTML cambiado, timeout) marca el job como fallido y notifica al operador. Un fallo de una tienda no detiene a las demás.
 
 ### 3.2 Normalización y matching

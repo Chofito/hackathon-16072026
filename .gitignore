@@ -175,3 +175,7 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node,macos
+
+# POC de scraping: salida y cache local de HTML/sitemaps
+poc-report.json
+.cache/

@@ -9,27 +9,31 @@
 
 ## Fase 0 — Reconocimiento técnico (1 tarde)
 
-Completar la tabla de recon de [SCRAPING.md](SCRAPING.md) para las 4 tiendas:
+Recon completado el 2026-07-16; tabla y notas en [SCRAPING.md](SCRAPING.md) §4:
 
-- [ ] MAX: JSON-LD, GTIN, sitemap, robots.txt, plataforma, WAF.
-- [ ] Kemik: JSON-LD, GTIN, sitemap, robots.txt, plataforma, WAF.
-- [ ] Pacifiko: JSON-LD, GTIN, sitemap, robots.txt, plataforma, WAF.
-- [ ] Curacao: JSON-LD, GTIN, sitemap, robots.txt, plataforma, WAF.
-- [ ] Decidir con cuál tienda empezar (la de mejores datos estructurados y menor fricción).
+- [x] MAX: Next.js headless sobre Magento, Cloudflare+CloudFront, JSON-LD parcial (sin availability), sin GTIN.
+- [x] Kemik: Next.js custom, sin JSON-LD (microdata + OG), sin GTIN.
+- [x] Pacifiko: OpenCart, JSON-LD limpio con availability y `mpn`, sin GTIN.
+- [x] Curacao: Magento 2, JSON-LD limpio + **GTIN (EAN-13) en tabla HTML**, sitemap GT dedicado.
+- [x] Orden de implementación: **Pacifiko → Curacao → MAX → Kemik**.
 
 ## Fase 1 — Colector mínimo
 
-- [ ] Crear proyecto en Supabase y aplicar el esquema de [DATA_MODEL.md](DATA_MODEL.md) (`stores`, `products`, `product_variants`, `store_products`, `price_points`, `users`, `subscriptions`, `notification_channels`, `match_review_queue`).
+Scaffold del monorepo Bun ya en `apps/collector` + `packages/*` + `supabase/`. Todo debe correr **localmente** (`bun run collect`, `bun run db:*`, `bun run fn:serve`) antes de desplegar.
+
+- [ ] Aplicar migraciones/seed en Supabase local (`bun run db:reset`) — esquema en [DATA_MODEL.md](DATA_MODEL.md) y `supabase/migrations/`.
 - [ ] Sembrar `stores` con las 4 tiendas y `products` con ~20 SKUs iniciales (subset del nicho tech/gaming).
-- [ ] Scraper de la primera tienda (Bun + TS): sitemap → JSON-LD → capturas, con rate limit y user-agent identificable.
-- [ ] Normalizador mínimo: matching por SKU/EAN contra `store_products`, discrepancias a `match_review_queue`.
-- [ ] Cron (GitHub Actions) corriendo cada 6–12 h con logs y alerta al operador en fallo.
+- [ ] Implementar el módulo de Pacifiko en `@pgt/scrapers` (completar el template): `scrape` (sitemap → JSON-LD → `RawCapture`) + `fetchOne`, con `politeGet` (rate limit + UA identificable). Reutiliza el parseo de `@pgt/core` (ya validado por el POC en `poc/`).
+- [ ] On-demand: completar la Edge Function `fetch-product` (Deno) — resolver tienda, `fetchOne` cortés, `upsert` + `price_point` + `subscription`, y encolar el resto en `product_requests` (ver [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)).
+- [ ] Normalizador mínimo (`@pgt/ingest`): matching por SKU/EAN contra `store_products`, discrepancias a `match_review_queue`. Mismo camino para capturas batch y on-demand.
+- [ ] Cron del colector Bun (GitHub Actions, `.github/workflows/collect.yml`) cada 6–12 h, con logs y alerta al operador en fallo.
 - [ ] Validar robustez del JSON-LD tras ~1 semana de ciclos (¿cambió el markup? ¿capturas consistentes?).
 
 ## Fase 2 — Cobertura completa y catálogo canónico
 
-- [ ] Scrapers de las 3 tiendas restantes, secuenciales en el mismo job.
+- [ ] Módulos de las 3 tiendas restantes (Curacao, MAX, Kemik) en `@pgt/scrapers`, secuenciales en el batch; cada uno con soporte on-demand (`fetchOne`).
 - [ ] Ampliar catálogo canónico a ~300 SKUs curados a mano (consolas, GPUs, celulares).
+- [ ] Colector de referencia de Amazon vía PA-API (USD): sembrar `stores` con Amazon (`kind='reference'`), matching por EAN/UPC→ASIN, capturas `source='api'`. Sin scraping de amazon.com. Requiere cuenta de afiliado aprobada (o proveedor licenciado como fallback).
 - [ ] Flujo de trabajo para la cola de revisión manual (aunque sea un query + update a mano al inicio).
 - [ ] Métricas del colector: capturas por ciclo, tasa de matching, tamaño de la cola de revisión.
 
