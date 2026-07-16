@@ -4,11 +4,12 @@ Plataforma de inteligencia de precios del ecommerce guatemalteco (MAX, Kemik, Pa
 
 ## Estado del proyecto
 
-Fase de documentación/diseño. Todavía no hay código. Antes de implementar nada, lee la fuente de verdad:
+Fase de documentación/diseño con scaffold Bun + scrapers implementados. Antes de implementar más, lee la fuente de verdad:
 
 | Documento | Contenido |
 |---|---|
 | [BRAINSTORM.md](BRAINSTORM.md) | Contexto de negocio, decisiones y alternativas descartadas |
+| [docs/TESIS.md](docs/TESIS.md) | Marco conceptual: qué es el producto en abstracto, primitivas, conceptos económicos → features |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitectura, componentes y principios de diseño |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Esquema de datos (Supabase/Postgres) e índices |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | Tácticas de colección, cortesía, matching y modos de falla |

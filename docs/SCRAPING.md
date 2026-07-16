@@ -206,6 +206,29 @@ Todo corre localmente sin desplegar, con el monorepo Bun + Supabase CLI:
 - **POC de matching:** `bun run poc/find-matches.ts <url>` (ver [../poc/README.md](../poc/README.md)) para validar extracción + matching cross-store sin tocar la DB.
 - Credenciales vía `.env` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`); nunca hardcodeadas. Ver `.env.example`.
 
+### 6.4 Búsqueda por texto (query) — qué sí y qué no
+
+La interfaz `Scraper` **no** tiene un método `search(query)` hoy. Tampoco se usa el buscador HTML de las tiendas:
+
+| Tienda | URL de búsqueda típica | ¿Usable? | Motivo |
+| --- | --- | --- | --- |
+| MAX | `/search?q=zelda` | **No** | `robots.txt` → `Disallow: /search?q*` (también `/catalogsearch/result?q*`). Técnicamente el SSR trae `productsList` en `__NEXT_DATA__`, pero **respetamos robots**. |
+| Kemik | buscador del site | **No** | Resultados renderizados en cliente (CSR); `fetch` plano no ve productos. |
+| Pacifiko / Curacao | rutas de búsqueda | **No** | Prohibidas o frágiles en `robots.txt`. |
+
+**Cómo se busca por texto hoy (sin LLM, robots-safe):**
+
+1. Descargar el **sitemap de producto** de la tienda (permitido).
+2. Rankear URLs por coincidencia de tokens contra la query / nombre fuente (marca + modelo + specs).
+3. Confirmar los top-N con `fetchOne` / extracción de la página de producto.
+4. Si el fuente trae EAN/GTIN y el candidato también, boost a score 1.0 (capa 1 de §7).
+
+Eso es exactamente lo que hace el POC (`bun run poc/find-matches.ts <url>`). Un futuro `Scraper.search(query)` debería encapsular ese flujo (filtrar sitemap localmente), **nunca** pegarle a `/search?q=…`.
+
+El **SKU interno no cruza** entre tiendas (`NSW2US` ≠ `820217`). Solo el EAN/GTIN (cuando existe) o la normalización marca+modelo sirven para join cross-store.
+
+Reportes de corridas: [../examples/cross-store-report.md](../examples/cross-store-report.md). Capturas `RawCapture` de ejemplo: [../examples/captures/](../examples/captures/).
+
 ## 7. Product matching (el moat técnico)
 
 Saber que "Consola Nintendo Switch 2" en Kemik y "NINTENDO SWITCH 2 NSW2-001" en MAX son el mismo producto. Estrategia por capas, de más barata a más cara:

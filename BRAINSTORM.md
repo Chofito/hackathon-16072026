@@ -8,6 +8,7 @@
 
 Este brainstorm fue refinado el 2026-07-16 con decisiones ya tomadas (ver sección 8). La fuente de verdad del diseño vive en `docs/`:
 
+- [docs/TESIS.md](docs/TESIS.md) — marco conceptual: qué es el producto en abstracto y qué adyacencias abre
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura y componentes
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — entidades y esquema de datos
 - [docs/SCRAPING.md](docs/SCRAPING.md) — tácticas de colección y matching

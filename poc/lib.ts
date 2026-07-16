@@ -125,17 +125,35 @@ export function tokenize(text: string): Set<string> {
 // Score = fracción de tokens de la query presentes en el candidato (0..1),
 // con un pequeño bonus por tokens numéricos coincidentes (ej. "2", "256"),
 // que suelen ser los que distinguen variantes (Switch vs Switch 2).
+//
+// Penalización dura: si la query trae un token de MODELO (a56, s25, x8, nsw2…)
+// y el candidato NO lo tiene, el score se corta a la mitad. Evita que
+// "Galaxy A54" gane sobre "Galaxy A56" solo por compartir marca+specs.
 export function scoreTokens(query: Set<string>, candidate: Set<string>): number {
   if (query.size === 0) return 0
   let matched = 0
   let numericBonus = 0
+  let modelMiss = false
   for (const t of query) {
     if (candidate.has(t)) {
       matched++
       if (/^\d+$/.test(t)) numericBonus += 0.15
+    } else if (isModelToken(t)) {
+      modelMiss = true
     }
   }
-  return matched / query.size + numericBonus
+  const base = matched / query.size + numericBonus
+  return modelMiss ? base * 0.45 : base
+}
+
+/** Tokens que identifican el modelo concreto (letra+dígitos o dígito suelto de versión). */
+function isModelToken(t: string): boolean {
+  // a56, s25, x8, nsw2, rtx5090, ps5…
+  if (/^[a-z]{1,4}\d{1,4}[a-z0-9]*$/i.test(t)) return true
+  // dígito suelto de versión ("2" de Switch 2) — ya se bonifica si match;
+  // si falta, también es señal fuerte de modelo distinto.
+  if (/^\d$/.test(t)) return true
+  return false
 }
 
 // Toma el slug legible de una URL de producto (último segmento de path,
@@ -290,7 +308,54 @@ export function extractProduct(html: string, url: string): ProductInfo {
   if (info.gtin === null) info.gtin = gtinFromHtml(html)
   if (info.name) info.name = decodeEntities(info.name)
 
+  // MAX: el __NEXT_DATA__ es más completo que su JSON-LD (eanCode, listPrice, stock).
+  const next = nextDataProduct(html)
+  if (next) {
+    if (!info.name && next.title) info.name = decodeEntities(next.title)
+    if (!info.sku && next.sku) info.sku = next.sku
+    if (!info.brand && next.brand?.title) info.brand = next.brand.title
+    if (!info.gtin && next.eanCode) info.gtin = next.eanCode
+    const sales = next.cachedPrices?.salesPrice?.value
+    const regular = next.cachedPrices?.regularPrice?.value
+    if (info.price === null && sales != null) info.price = sales
+    if (info.listPrice === null && sales != null && regular != null && regular > sales) {
+      info.listPrice = regular
+    }
+    if (!info.currency && next.cachedPrices?.salesPrice?.currency) {
+      info.currency = next.cachedPrices.salesPrice.currency
+    }
+    if (info.availability === null && typeof next.salableQuantity === 'number') {
+      info.availability = next.salableQuantity > 0 ? 'in_stock' : 'out_of_stock'
+    }
+    if (info.source === 'none') info.source = 'jsonld'
+  }
+
   return info
+}
+
+interface MaxNextProduct {
+  sku?: string
+  title?: string
+  eanCode?: string
+  salableQuantity?: number
+  brand?: { title?: string }
+  cachedPrices?: {
+    salesPrice?: { currency?: string; value?: number }
+    regularPrice?: { currency?: string; value?: number }
+  }
+}
+
+function nextDataProduct(html: string): MaxNextProduct | null {
+  const m = /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/.exec(html)
+  if (!m?.[1]) return null
+  try {
+    const data = JSON.parse(m[1]) as {
+      props?: { pageProps?: { product?: MaxNextProduct } }
+    }
+    return data.props?.pageProps?.product ?? null
+  } catch {
+    return null
+  }
 }
 
 // --- Sitemaps ------------------------------------------------------------

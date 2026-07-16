@@ -44,6 +44,15 @@ interface StoreConfig {
 
 const STORES: StoreConfig[] = [
   {
+    slug: 'max',
+    name: 'MAX',
+    currency: 'GTQ',
+    sitemapIndex: 'https://www.max.com.gt/sitemap.xml',
+    // MAX: sitemap-0.xml (productos) + sitemaps por categoría; excluir el índice.
+    isProductSitemap: (loc) =>
+      /sitemap-\d+\.xml/i.test(loc) || /sitemap-[a-z0-9-]+\.xml/i.test(loc),
+  },
+  {
     slug: 'pacifiko',
     name: 'Pacifiko',
     currency: 'GTQ',
@@ -65,6 +74,17 @@ const STORES: StoreConfig[] = [
     isProductSitemap: (loc) => /sitemap-product\.xml/i.test(loc),
   },
 ]
+
+function storeSlugFromUrl(url: string): string | null {
+  try {
+    const host = new URL(url).hostname
+    if (host.endsWith('max.com.gt')) return 'max'
+    if (host.endsWith('kemik.gt')) return 'kemik'
+    if (host.endsWith('pacifiko.com')) return 'pacifiko'
+    if (host.endsWith('lacuracaonline.com')) return 'curacao'
+  } catch { /* ignore */ }
+  return null
+}
 
 const TOP_CANDIDATES = 5
 const MIN_SLUG_SCORE = 0.34
@@ -126,6 +146,7 @@ async function findInStore(
     .slice(0, TOP_CANDIDATES)
 
   // Confirmación: descargar cada candidato y extraer su info real.
+  // Bonus: si el query trae GTIN y el candidato lo tiene igual → score 1.0 (capa EAN).
   for (const c of ranked) {
     try {
       const html = await politeFetch(c.url)
@@ -137,6 +158,19 @@ async function findInStore(
     }
   }
   return ranked.sort((a, b) => (b.nameScore ?? 0) - (a.nameScore ?? 0))
+}
+
+/** Re-rankea candidatos: match EAN exacto gana sobre score por nombre. */
+function applyEanBoost(candidates: Candidate[], sourceGtin: string | null): Candidate[] {
+  if (!sourceGtin) return candidates
+  return [...candidates]
+    .map((c) => {
+      if (c.info?.gtin && c.info.gtin === sourceGtin) {
+        return { ...c, nameScore: 1 }
+      }
+      return c
+    })
+    .sort((a, b) => (b.nameScore ?? 0) - (a.nameScore ?? 0))
 }
 
 function fmtPrice(info?: ProductInfo): string {
@@ -174,18 +208,27 @@ async function main(): Promise<void> {
   printSource(source, query)
 
   const report: Record<string, unknown> = { source, matches: {} }
+  const sourceStore = storeSlugFromUrl(sourceUrl)
 
-  for (const store of STORES) {
+  // Destinos = todas las tiendas excepto la origen (el SKU interno no cruza).
+  const destinations = STORES.filter((s) => s.slug !== sourceStore)
+
+  for (const store of destinations) {
     console.error(`\nBuscando en ${store.name}...`)
-    const candidates = await findInStore(store, query, maxSitemaps)
+    let candidates = await findInStore(store, query, maxSitemaps)
+    candidates = applyEanBoost(candidates, source.gtin)
     console.log(`\n── ${store.name} ${'─'.repeat(40 - store.name.length)}`)
     if (candidates.length === 0) {
       console.log('  (sin candidatos por coincidencia de tokens)')
     }
     candidates.slice(0, 3).forEach((c, i) => {
       const score = c.nameScore ?? 0
-      const flag = i === 0 ? (score >= CONFIDENT_SCORE ? '✓ match ' : '? revisar') : '        '
-      console.log(`  ${flag} score=${score.toFixed(2)}  ${fmtPrice(c.info)}`)
+      const eanHit = source.gtin && c.info?.gtin === source.gtin
+      const flag = i === 0
+        ? (score >= CONFIDENT_SCORE || eanHit ? '✓ match ' : '? revisar')
+        : '        '
+      const via = eanHit ? ' [EAN]' : ''
+      console.log(`  ${flag} score=${score.toFixed(2)}${via}  ${fmtPrice(c.info)}`)
       console.log(`     ${c.info?.name ?? slugFromUrl(c.url)}`)
       console.log(`     sku=${c.info?.sku ?? '—'} gtin=${c.info?.gtin ?? '—'} stock=${c.info?.availability ?? '—'}`)
       console.log(`     ${c.url}`)
@@ -193,6 +236,7 @@ async function main(): Promise<void> {
     ;(report.matches as Record<string, unknown>)[store.slug] = candidates.map((c) => ({
       url: c.url,
       score: c.nameScore,
+      eanMatch: !!(source.gtin && c.info?.gtin === source.gtin),
       info: c.info,
     }))
   }
