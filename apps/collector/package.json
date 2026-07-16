@@ -1,0 +1,16 @@
+{
+  "name": "@pgt/collector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pgt/core": "workspace:*",
+    "@pgt/db": "workspace:*",
+    "@pgt/ingest": "workspace:*",
+    "@pgt/scrapers": "workspace:*"
+  }
+}

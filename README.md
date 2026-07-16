@@ -1,1 +1,54 @@
-# Hackathon CursorXTec 16/07/2026
+# Precios GT — Inteligencia de precios ecommerce Guatemala
+
+Monorepo (Bun workspaces) de la plataforma de inteligencia de precios.
+Contexto de negocio en [BRAINSTORM.md](BRAINSTORM.md); diseño técnico en [docs/](docs).
+
+## Stack
+
+- **Bun + TypeScript** — colector y librerías compartidas.
+- **Supabase** (Postgres + Auth) — almacenamiento y edge functions.
+- **Next.js en Vercel** — producto web (lo instancia el equipo en `apps/web`).
+
+## Estructura
+
+```
+apps/
+  collector/   @pgt/collector  CLI que orquesta scrapers -> ingest -> Supabase (corre local)
+  web/         (pendiente)     Next.js — App Router, Tailwind, shadcn/Radix
+packages/
+  core/        @pgt/core       tipos de dominio + matching + parsing JSON-LD/sitemap (portable Bun+Deno)
+  db/          @pgt/db         cliente Supabase tipado + database.types + query helpers
+  scrapers/    @pgt/scrapers   interfaz Scraper + un módulo por tienda (TEMPLATE)
+  ingest/      @pgt/ingest     normalización + matching + insert + cola de revisión (TEMPLATE)
+supabase/
+  migrations/  esquema (docs/DATA_MODEL.md) + product_requests
+  seed.sql     4 tiendas + ~20 SKUs
+  functions/fetch-product/     Edge Function (Deno) on-demand (TEMPLATE)
+.github/workflows/collect.yml  cron del colector (documentado/desactivado)
+```
+
+## Empezar
+
+```sh
+bun install
+cp .env.example .env   # completar con los valores de `supabase start`
+```
+
+## Scripts
+
+| Comando | Qué hace |
+|---|---|
+| `bun run typecheck` | Type-check de todos los workspaces Bun |
+| `bun run collect` | Corre el colector local (scrapers -> ingest -> Supabase) |
+| `bun run db:start` / `db:stop` | Stack local de Supabase (requiere Docker) |
+| `bun run db:reset` | Aplica migraciones + seed |
+| `bun run gen:types` | Regenera `packages/db/src/database.types.ts` desde el schema local |
+| `bun run fn:serve` / `fn:deploy` | Edge Function `fetch-product` |
+| `bun run dev:web` / `build:web` | Next.js (una vez creado `apps/web`) |
+
+## Notas para el equipo
+
+- Los paquetes marcados **TEMPLATE** traen la interfaz y stubs con `TODO(dev-*)`; ahí se implementa la lógica real.
+- `@pgt/scrapers` debe mantenerse **runtime-agnóstico** (fetch estándar, sin `Bun.*`) para reutilizarse en la Edge Function (Deno).
+- `apps/web`: instanciar con `create-next-app` (App Router, Tailwind, shadcn/Radix) y nombrar el paquete `@pgt/web` para que calcen los scripts root.
+- La CLI de Supabase está incluida como devDependency: úsala con `bunx supabase ...` (o los scripts `db:*`).

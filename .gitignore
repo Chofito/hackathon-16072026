@@ -175,3 +175,11 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node,macos
+
+### Supabase ###
+supabase/.branches
+supabase/.temp
+supabase/.env
+
+### Turbo / build caches ###
+.turbo
