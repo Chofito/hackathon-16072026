@@ -5,10 +5,12 @@ Plataforma de inteligencia de precios del ecommerce guatemalteco (MAX, Kemik, Pa
 ## Estado del proyecto
 
 Fase de scaffold: el monorepo existe (`apps/`, `packages/`, `supabase/`) pero scrapers, ingest y la Edge Function son templates con `TODO(dev-*)`. Antes de implementar nada, lee la fuente de verdad:
+Fase de documentación/diseño con scaffold Bun + scrapers implementados. Antes de implementar más, lee la fuente de verdad:
 
 | Documento | Contenido |
 |---|---|
 | [BRAINSTORM.md](BRAINSTORM.md) | Contexto de negocio, decisiones y alternativas descartadas |
+| [docs/TESIS.md](docs/TESIS.md) | Marco conceptual: qué es el producto en abstracto, primitivas, conceptos económicos → features |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitectura, componentes y principios de diseño |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Esquema de datos (Supabase/Postgres) e índices |
 | [docs/USER_FLOW.md](docs/USER_FLOW.md) | Flujo de usuario (búsqueda, on-demand, comparador) — contrato entre la UI y el dev-scraper |
@@ -16,6 +18,8 @@ Fase de scaffold: el monorepo existe (`apps/`, `packages/`, `supabase/`) pero sc
 | `supabase/seed_demo.sql` | Precios sintéticos **solo desarrollo local** — cargados con `db:reset` o `db:seed-demo` |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | Tácticas de colección, cortesía, matching y modos de falla |
 | [docs/TASKS.md](docs/TASKS.md) | Backlog por fases |
+| [docs/EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md) | On-demand UI: `fetch-product` + `find-matches` + cache sitemaps |
+| [docs/plans/](docs/plans/) | Diseños validados (p. ej. edge on-demand) |
 | [docs/sessions/](docs/sessions/) | Registro de sesiones de planificación |
 
 ## Decisiones de stack (ya tomadas, no re-litigar)

@@ -56,9 +56,23 @@ export interface ParsedProduct {
   name: string | null
   sku: string | null
   eanGtin: string | null
+  brand: string | null
   price: number | null
+  /** Precio de lista/tachado, si el JSON-LD lo expone (offers.highPrice o price raiz). */
+  listPrice: number | null
   currency: string | null
   stockStatus: StockStatus
+  /** URL canonica declarada por la tienda (offers.url / node.url), si existe. */
+  url: string | null
+}
+
+function extractBrand(node: JsonLdNode): string | null {
+  const brand = node.brand
+  if (typeof brand === 'string') return toStr(brand)
+  if (brand && typeof brand === 'object') {
+    return toStr((brand as Record<string, unknown>).name)
+  }
+  return null
 }
 
 function firstOffer(node: JsonLdNode): Record<string, unknown> | null {
@@ -101,6 +115,17 @@ function mapAvailability(value: unknown): StockStatus {
 /** Extrae los campos relevantes de un nodo Product JSON-LD. */
 export function parseProductJsonLd(node: JsonLdNode): ParsedProduct {
   const offer = firstOffer(node)
+  const price = offer ? toNumber(offer.price ?? offer.lowPrice) : null
+
+  // listPrice: offers.highPrice, o el `price` de nivel raiz cuando es mayor que
+  // el de venta (patron de Curacao: root price = precio de lista tachado).
+  let listPrice: number | null = offer ? toNumber(offer.highPrice) : null
+  if (listPrice === null && price !== null) {
+    const rootPrice = toNumber(node.price)
+    if (rootPrice !== null && rootPrice > price) listPrice = rootPrice
+  }
+  if (listPrice !== null && price !== null && listPrice <= price) listPrice = null
+
   return {
     name: toStr(node.name),
     sku: toStr(node.sku) ?? toStr(node.mpn),
@@ -111,9 +136,12 @@ export function parseProductJsonLd(node: JsonLdNode): ParsedProduct {
       toStr(node.gtin14) ??
       toStr(node.ean) ??
       null,
-    price: offer ? toNumber(offer.price ?? offer.lowPrice) : null,
+    brand: extractBrand(node),
+    price,
+    listPrice,
     currency: offer ? toStr(offer.priceCurrency) : null,
     stockStatus: offer ? mapAvailability(offer.availability) : 'unknown',
+    url: (offer ? toStr(offer.url) : null) ?? toStr(node.url) ?? toStr(node['@id']),
   }
 }
 

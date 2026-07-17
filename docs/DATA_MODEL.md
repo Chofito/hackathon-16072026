@@ -22,6 +22,8 @@ erDiagram
         text name
         text base_url
         text platform
+        text kind
+        text currency
         boolean active
         timestamptz created_at
     }
@@ -118,11 +120,15 @@ erDiagram
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `name` | `text` | MAX, Kemik, Pacifiko, Curacao |
+| `name` | `text` | MAX, Kemik, Pacifiko, Curacao, Amazon |
 | `base_url` | `text` | ej. `https://www.max.com.gt` |
-| `platform` | `text` | Magento, VTEX, custom… (sale del recon técnico) |
+| `platform` | `text` | Magento, VTEX, OpenCart, custom, `pa-api`… (sale del recon técnico) |
+| `kind` | `text` | `local` (tienda GT comparable) o `reference` (ancla de precio, ej. Amazon). El comparador nunca mezcla `reference` en el ranking de precio más barato |
+| `currency` | `text` | moneda por defecto de la fuente: `GTQ` para tiendas locales, `USD` para Amazon. Cada `price_point` la reconfirma |
 | `active` | `boolean` | permite pausar una tienda sin borrar datos |
 | `created_at` | `timestamptz` | |
+
+Amazon se modela como un `store` con `kind = 'reference'` y `currency = 'USD'`. Sus `store_products.store_sku` guardan el `ASIN`. Se captura por API oficial (PA-API), no scraping — ver [SCRAPING.md](SCRAPING.md) §4.
 
 ### `products` — catálogo canónico (el moat)
 
@@ -234,6 +240,15 @@ pending → processing → done
 - `failed`: la captura falló (WAF, timeout, markup inesperado); **no** hay `price_point` nuevo — nunca se inventa uno para "cerrar" la fila.
 
 El índice parcial `idx_product_requests_pending` (sección 3) está pensado exactamente para el paso 1 del collector: encontrar rápido las filas en `pending` sin escanear toda la tabla.
+### `sitemap_urls` — cache de sitemaps para matching on-demand
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `store_key` | `text` | clave del scraper: `max` / `kemik` / `pacifiko` / `curacao` |
+| `url` | `text` | URL de producto descubierta en el sitemap |
+| `refreshed_at` | `timestamptz` | timestamp de la corrida de `refresh-sitemaps` |
+
+PK `(store_key, url)`. RLS on sin policies públicas — solo service role. Lo consume `find-matches`; lo escribe `bun run refresh-sitemaps`. Stale > 7 días → la Edge Function responde `503` (ver [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)).
 
 ## 3. Índices clave
 

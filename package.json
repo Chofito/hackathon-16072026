@@ -17,8 +17,11 @@
     "db:reset": "bunx supabase db reset",
     "db:seed-demo": "bunx supabase db execute --local --file supabase/seed_demo.sql",
     "gen:types": "bunx supabase gen types typescript --local > packages/db/src/database.types.ts",
-    "fn:serve": "bunx supabase functions serve fetch-product --no-verify-jwt",
-    "fn:deploy": "bunx supabase functions deploy fetch-product",
+    "fn:serve": "bunx supabase functions serve --no-verify-jwt",
+    "fn:deploy": "bunx supabase functions deploy fetch-product && bunx supabase functions deploy find-matches",
+    "refresh-sitemaps": "bun run scripts/refresh-sitemaps.ts",
+    "poc": "bun run poc/find-matches.ts",
+    "examples": "bun run scripts/capture-examples.ts",
     "typecheck": "bun run --filter '*' typecheck"
   },
   "devDependencies": {

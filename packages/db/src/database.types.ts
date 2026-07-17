@@ -215,6 +215,20 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['product_requests']['Insert']>
         Relationships: []
       }
+      sitemap_urls: {
+        Row: {
+          store_key: string
+          url: string
+          refreshed_at: Timestamptz
+        }
+        Insert: {
+          store_key: string
+          url: string
+          refreshed_at?: Timestamptz
+        }
+        Update: Partial<Database['public']['Tables']['sitemap_urls']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

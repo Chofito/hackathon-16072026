@@ -183,3 +183,7 @@ supabase/.env
 
 ### Turbo / build caches ###
 .turbo
+
+# POC de scraping: salida y cache local de HTML/sitemaps
+poc-report.json
+.cache/

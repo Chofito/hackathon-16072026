@@ -41,6 +41,9 @@ cp .env.example .env   # completar con los valores de `supabase start`
 |---|---|
 | `bun run typecheck` | Type-check de todos los workspaces Bun |
 | `bun run collect` | Corre el colector local (scrapers -> ingest -> Supabase) |
+| `bun run examples -- <url>` | Smoke test: captura 1 URL → `examples/captures/` |
+| `bun run refresh-sitemaps` | Llena cache `sitemap_urls` (necesario para `find-matches`) |
+| `bun run fn:serve` / `fn:deploy` | Edge Functions `fetch-product` + `find-matches` |
 | `bun run db:start` / `db:stop` | Stack local de Supabase (requiere Docker) |
 | `bun run db:reset` | Aplica migraciones + seed (incluye `seed_demo.sql` con precios sintéticos para la UI) |
 | `bun run db:seed-demo` | Vuelve a cargar solo los datos demo (sin resetear migraciones) |

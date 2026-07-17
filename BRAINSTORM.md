@@ -8,6 +8,7 @@
 
 Este brainstorm fue refinado el 2026-07-16 con decisiones ya tomadas (ver sección 8). La fuente de verdad del diseño vive en `docs/`:
 
+- [docs/TESIS.md](docs/TESIS.md) — marco conceptual: qué es el producto en abstracto y qué adyacencias abre
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura y componentes
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — entidades y esquema de datos
 - [docs/USER_FLOW.md](docs/USER_FLOW.md) — flujo de usuario (búsqueda, on-demand, comparador)
@@ -113,6 +114,7 @@ Resueltas en la sesión de refinamiento del 2026-07-16:
 - **Stack del colector:** TypeScript + Bun, scripts cron secuenciales sin colas ni workers — prioridad en velocidad de tener algo demostrable.
 - **Backend/producto:** Next.js (SSR + API routes) en Vercel + Supabase (Postgres gestionado, auth). Sin NestJS separado.
 - **Quinta tienda:** descartada por ahora (El Duende ya no existe). Foco en MAX, Kemik, Pacifiko y Curacao; se re-evaluará en fase SaaS.
+- **On-demand UI (2026-07-16):** dos Edge Functions síncronas (`fetch-product`, `find-matches`) + cache Postgres de sitemaps (`sitemap_urls`) refrescado fuera del request. Sin crawl síncrono de las 4 tiendas en el path del usuario. Ver [docs/EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md).
 
 Resueltas en la sesión de scaffolding + flujo de usuario del 2026-07-16 (ver [docs/sessions/2026-07-16-scaffold-monorepo.md](docs/sessions/2026-07-16-scaffold-monorepo.md) y [docs/sessions/2026-07-16-flujo-rename-ui.md](docs/sessions/2026-07-16-flujo-rename-ui.md)):
 
