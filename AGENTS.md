@@ -14,6 +14,8 @@ Fase de documentación/diseño con scaffold Bun + scrapers implementados. Antes 
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Esquema de datos (Supabase/Postgres) e índices |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | Tácticas de colección, cortesía, matching y modos de falla |
 | [docs/TASKS.md](docs/TASKS.md) | Backlog por fases |
+| [docs/EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md) | On-demand UI: `fetch-product` + `find-matches` + cache sitemaps |
+| [docs/plans/](docs/plans/) | Diseños validados (p. ej. edge on-demand) |
 | [docs/sessions/](docs/sessions/) | Registro de sesiones de planificación |
 
 ## Decisiones de stack (ya tomadas, no re-litigar)

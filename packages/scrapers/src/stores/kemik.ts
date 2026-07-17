@@ -82,7 +82,7 @@ function captureFromHtml(html: string, url: string): RawCapture | null {
 export const kemikScraper: Scraper = {
   key: 'kemik',
 
-  async scrape(ctx: ScrapeContext): Promise<ScrapeResult> {
+  async listProductUrls(ctx: ScrapeContext): Promise<string[]> {
     // Sitemap paginado (~60-78k URLs): aqui va el universo completo; el
     // colector filtra despues contra los SKUs trackeados antes de fetchear.
     const urls = new Set<string>()
@@ -94,7 +94,12 @@ export const kemikScraper: Scraper = {
         if (m[1]) urls.add(m[1].replace(/&amp;/g, '&'))
       }
     }
-    return runOverUrls([...urls], ctx, (url, c) => this.fetchOne({ url }, c))
+    return [...urls]
+  },
+
+  async scrape(ctx: ScrapeContext): Promise<ScrapeResult> {
+    const urls = await this.listProductUrls(ctx)
+    return runOverUrls(urls, ctx, (url, c) => this.fetchOne({ url }, c))
   },
 
   async fetchOne(input: FetchOneInput, ctx: ScrapeContext): Promise<RawCapture | null> {

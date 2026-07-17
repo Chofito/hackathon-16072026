@@ -54,8 +54,12 @@ function isProductUrl(url: string): boolean {
 export const curacaoScraper: Scraper = {
   key: 'curacao',
 
+  listProductUrls(ctx: ScrapeContext): Promise<string[]> {
+    return discoverProductUrls(SITEMAP_INDEX, ctx, isProductUrl)
+  },
+
   async scrape(ctx: ScrapeContext): Promise<ScrapeResult> {
-    const urls = await discoverProductUrls(SITEMAP_INDEX, ctx, isProductUrl)
+    const urls = await this.listProductUrls(ctx)
     return runOverUrls(urls, ctx, (url, c) => this.fetchOne({ url }, c))
   },
 

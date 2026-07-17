@@ -34,12 +34,14 @@ export interface FetchOneInput {
 
 /**
  * Interfaz comun de un scraper por tienda.
- * - `scrape`: ciclo completo (sitemap -> JSON-LD -> capturas) para el cron.
+ * - `listProductUrls`: descubre URLs via sitemap (para cache / batch).
+ * - `scrape`: ciclo completo (sitemap -> capturas) para el cron.
  * - `fetchOne`: un solo producto para el flujo on-demand del usuario.
  */
 export interface Scraper {
   /** Clave de la tienda, ej. 'max'. Debe existir un `stores.name` asociado. */
   readonly key: string
+  listProductUrls(ctx: ScrapeContext): Promise<string[]>
   scrape(ctx: ScrapeContext): Promise<ScrapeResult>
   fetchOne(input: FetchOneInput, ctx: ScrapeContext): Promise<RawCapture | null>
 }

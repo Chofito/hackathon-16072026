@@ -201,6 +201,16 @@ Separar suscripción de canal permite agregar canales sin tocar las suscripcione
 | `status` | `text` | `pending` / `matched` / `new_product` / `ignored` |
 | `created_at` | `timestamptz` | |
 
+### `sitemap_urls` — cache de sitemaps para matching on-demand
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `store_key` | `text` | clave del scraper: `max` / `kemik` / `pacifiko` / `curacao` |
+| `url` | `text` | URL de producto descubierta en el sitemap |
+| `refreshed_at` | `timestamptz` | timestamp de la corrida de `refresh-sitemaps` |
+
+PK `(store_key, url)`. RLS on sin policies públicas — solo service role. Lo consume `find-matches`; lo escribe `bun run refresh-sitemaps`. Stale > 7 días → la Edge Function responde `503` (ver [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)).
+
 ## 3. Índices clave
 
 ```sql
