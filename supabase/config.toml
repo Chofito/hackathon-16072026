@@ -1,5 +1,5 @@
 # Supabase local stack. Docs: https://supabase.com/docs/guides/local-development
-project_id = "precios-gt"
+project_id = "guateofertas"
 
 [api]
 enabled = true
@@ -32,3 +32,6 @@ enable_confirmations = false
 enabled = true
 # Punto de entrada por policy de Supabase para funciones.
 policy = "oneshot"
+
+[db.seed]
+sql_paths = ["./seed.sql", "./seed_demo.sql"]

@@ -1,20 +1,21 @@
 {
-  "name": "precios-gt",
+  "name": "guateofertas",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Plataforma de inteligencia de precios ecommerce Guatemala (monorepo Bun)",
+  "description": "GuateOfertas — plataforma de inteligencia de precios ecommerce Guatemala (monorepo Bun)",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "collect": "bun run --filter @pgt/collector start",
-    "dev:web": "bun run --filter @pgt/web dev",
-    "build:web": "bun run --filter @pgt/web build",
+    "collect": "bun run --filter @guateofertas/collector start",
+    "dev:web": "bun run --filter @guateofertas/web dev",
+    "build:web": "bun run --filter @guateofertas/web build",
     "db:start": "bunx supabase start",
     "db:stop": "bunx supabase stop",
     "db:reset": "bunx supabase db reset",
+    "db:seed-demo": "bunx supabase db execute --local --file supabase/seed_demo.sql",
     "gen:types": "bunx supabase gen types typescript --local > packages/db/src/database.types.ts",
     "fn:serve": "bunx supabase functions serve fetch-product --no-verify-jwt",
     "fn:deploy": "bunx supabase functions deploy fetch-product",

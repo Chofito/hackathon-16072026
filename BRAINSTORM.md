@@ -10,6 +10,8 @@ Este brainstorm fue refinado el 2026-07-16 con decisiones ya tomadas (ver secci�
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura y componentes
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — entidades y esquema de datos
+- [docs/USER_FLOW.md](docs/USER_FLOW.md) — flujo de usuario (búsqueda, on-demand, comparador)
+- [docs/EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md) — Edge Function `fetch-product` on-demand
 - [docs/SCRAPING.md](docs/SCRAPING.md) — tácticas de colección y matching
 - [docs/TASKS.md](docs/TASKS.md) — backlog por fases
 
@@ -111,6 +113,14 @@ Resueltas en la sesión de refinamiento del 2026-07-16:
 - **Stack del colector:** TypeScript + Bun, scripts cron secuenciales sin colas ni workers — prioridad en velocidad de tener algo demostrable.
 - **Backend/producto:** Next.js (SSR + API routes) en Vercel + Supabase (Postgres gestionado, auth). Sin NestJS separado.
 - **Quinta tienda:** descartada por ahora (El Duende ya no existe). Foco en MAX, Kemik, Pacifiko y Curacao; se re-evaluará en fase SaaS.
+
+Resueltas en la sesión de scaffolding + flujo de usuario del 2026-07-16 (ver [docs/sessions/2026-07-16-scaffold-monorepo.md](docs/sessions/2026-07-16-scaffold-monorepo.md) y [docs/sessions/2026-07-16-flujo-rename-ui.md](docs/sessions/2026-07-16-flujo-rename-ui.md)):
+
+- **Nombre del proyecto:** rename total de PreciosGT a **GuateOfertas** (scope de paquetes `@guateofertas/*`, ya aplicado en todo el repo — código, docs, `package.json`).
+- **Flujo on-demand confirmado:** cuando un usuario pega un link no trackeado, la Edge Function `fetch-product` hace **fetch síncrono de solo esa tienda** (1 request, cortesía), responde el precio al instante y **encola** el resto de tiendas en `product_requests` para que el collector las procese después. La UI muestra estado parcial ("buscando en otras tiendas…") mientras se completa. Detalle del flujo completo en [docs/USER_FLOW.md](docs/USER_FLOW.md).
+- **Ciclo de estados de `product_requests`:** `pending → processing → done | failed`, documentado como convención de aplicación (la migración solo define el default `pending`; el dev-scraper implementa las transiciones).
+- **Acceso anónimo con rate limit:** un visitante sin login puede pegar un link y disparar el camino on-demand (sujeto a rate limit); crear una `subscription` (alerta de precio) sí requiere login. Ver [docs/EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md).
+- **UI mínima pública:** se construye una UI mínima en `apps/web` (home con buscador texto/URL + comparador `/producto/[id]`) en paralelo al resto del scaffold, para tener el flujo completo demostrable.
 
 Sigue abierta:
 

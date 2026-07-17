@@ -5,13 +5,13 @@
 // El esqueleto compila y describe el flujo; el dev que retome esto refina los TODO
 // (dedupe, deteccion price vs list_price vs conditional_price, variantes, etc.).
 
-import { matchCapture, MATCH_CONFIDENCE_THRESHOLD, type Product, type RawCapture } from '@pgt/core'
+import { matchCapture, MATCH_CONFIDENCE_THRESHOLD, type Product, type RawCapture } from '@guateofertas/core'
 import {
   enqueueReview,
   insertPricePoints,
   upsertStoreProduct,
   type Db,
-} from '@pgt/db'
+} from '@guateofertas/db'
 
 export interface IngestSummary {
   inserted: number

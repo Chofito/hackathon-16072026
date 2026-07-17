@@ -9,9 +9,9 @@
 //   4. Mapear ParsedProduct -> RawCapture. Distinguir price / list_price / conditional_price.
 //   5. Acumular capturas y fallos; fallar ruidosamente ante challenge/markup inesperado.
 
-import type { RawCapture } from '@pgt/core'
+import type { RawCapture } from '@guateofertas/core'
 // Helpers portables disponibles para la implementacion real:
-// import { parseProductFromHtml, parseSitemapUrls } from '@pgt/core'
+// import { parseProductFromHtml, parseSitemapUrls } from '@guateofertas/core'
 // import { politeGet } from '../http.ts'
 import type {
   FetchOneInput,

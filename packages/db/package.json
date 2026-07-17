@@ -1,5 +1,5 @@
 {
-  "name": "@pgt/db",
+  "name": "@guateofertas/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pgt/core": "workspace:*",
+    "@guateofertas/core": "workspace:*",
     "@supabase/supabase-js": "^2.45.4"
   }
 }

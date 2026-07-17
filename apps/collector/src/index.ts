@@ -5,12 +5,12 @@
 // Principios (docs/ARCHITECTURE.md): secuencial, sin colas; un fallo de una
 // tienda no detiene a las demas; fallar ruidosamente al final si hubo fallos.
 
-import { createServiceClient, getProducts } from '@pgt/db'
-import { allScrapers, type ScrapeContext } from '@pgt/scrapers'
-import { ingestCaptures } from '@pgt/ingest'
+import { createServiceClient, getProducts } from '@guateofertas/db'
+import { allScrapers, type ScrapeContext } from '@guateofertas/scrapers'
+import { ingestCaptures } from '@guateofertas/ingest'
 
 const USER_AGENT =
-  process.env.SCRAPER_USER_AGENT ?? 'PreciosGT-Bot/0.1 (+https://example.com; contacto@example.com)'
+  process.env.SCRAPER_USER_AGENT ?? 'GuateOfertasBot/0.1 (+https://example.com; contacto@example.com)'
 const MIN_DELAY_MS = Number(process.env.SCRAPER_MIN_DELAY_MS ?? '3000')
 
 async function main(): Promise<void> {

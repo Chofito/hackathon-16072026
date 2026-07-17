@@ -1,6 +1,6 @@
 // Tipos de dominio compartidos. Fuente de verdad: docs/DATA_MODEL.md.
 // Estos tipos representan el dominio en camelCase; el mapeo a las columnas
-// snake_case de Postgres vive en @pgt/db.
+// snake_case de Postgres vive en @guateofertas/db.
 
 export type StockStatus = 'in_stock' | 'out_of_stock' | 'unknown'
 

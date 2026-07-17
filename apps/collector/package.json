@@ -1,5 +1,5 @@
 {
-  "name": "@pgt/collector",
+  "name": "@guateofertas/collector",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,9 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pgt/core": "workspace:*",
-    "@pgt/db": "workspace:*",
-    "@pgt/ingest": "workspace:*",
-    "@pgt/scrapers": "workspace:*"
+    "@guateofertas/core": "workspace:*",
+    "@guateofertas/db": "workspace:*",
+    "@guateofertas/ingest": "workspace:*",
+    "@guateofertas/scrapers": "workspace:*"
   }
 }

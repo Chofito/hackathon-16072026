@@ -1,16 +1,19 @@
-# Guía para agentes
+# Guía para agentes — GuateOfertas
 
 Plataforma de inteligencia de precios del ecommerce guatemalteco (MAX, Kemik, Pacifiko, Curacao). El activo del proyecto es el **dataset histórico de precios + el catálogo canónico de productos** — cualquier decisión que arriesgue esos datos se descarta.
 
 ## Estado del proyecto
 
-Fase de documentación/diseño. Todavía no hay código. Antes de implementar nada, lee la fuente de verdad:
+Fase de scaffold: el monorepo existe (`apps/`, `packages/`, `supabase/`) pero scrapers, ingest y la Edge Function son templates con `TODO(dev-*)`. Antes de implementar nada, lee la fuente de verdad:
 
 | Documento | Contenido |
 |---|---|
 | [BRAINSTORM.md](BRAINSTORM.md) | Contexto de negocio, decisiones y alternativas descartadas |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitectura, componentes y principios de diseño |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Esquema de datos (Supabase/Postgres) e índices |
+| [docs/USER_FLOW.md](docs/USER_FLOW.md) | Flujo de usuario (búsqueda, on-demand, comparador) — contrato entre la UI y el dev-scraper |
+| [docs/EDGE_FUNCTIONS.md](docs/EDGE_FUNCTIONS.md) | Edge Function `fetch-product` (acceso anónimo, rate limit, contrato con el collector) |
+| `supabase/seed_demo.sql` | Precios sintéticos **solo desarrollo local** — cargados con `db:reset` o `db:seed-demo` |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | Tácticas de colección, cortesía, matching y modos de falla |
 | [docs/TASKS.md](docs/TASKS.md) | Backlog por fases |
 | [docs/sessions/](docs/sessions/) | Registro de sesiones de planificación |

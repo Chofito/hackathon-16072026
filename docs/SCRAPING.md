@@ -15,7 +15,7 @@
 |---|---|
 | Frecuencia de ciclo | cada 6–12 horas |
 | Rate limit | 1 request cada 2–5 segundos por tienda; jamás en paralelo contra la misma tienda |
-| User-agent | identificable, con URL del proyecto y contacto (ej. `PreciosGT-Bot/0.1 (+https://... ; contacto@...)`) |
+| User-agent | identificable, con URL del proyecto y contacto (ej. `GuateOfertasBot/0.1 (+https://... ; contacto@...)`) |
 | robots.txt | se respeta siempre, incluyendo `Crawl-delay` |
 | Caching | condicionales `ETag`/`Last-Modified` cuando la tienda los soporte; no re-descargar sitemaps sin cambios |
 | Alcance | solo URLs de producto del nicho (~300 SKUs); no crawl exploratorio |

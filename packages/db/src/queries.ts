@@ -1,7 +1,7 @@
 // Helpers de query/insert sobre Supabase. Mapean entre el dominio (camelCase,
-// @pgt/core) y las columnas snake_case de Postgres.
+// @guateofertas/core) y las columnas snake_case de Postgres.
 
-import type { Product, RawCapture, StockStatus } from '@pgt/core'
+import type { Product, RawCapture, StockStatus } from '@guateofertas/core'
 import type { Db } from './client.ts'
 import type { TablesInsert } from './database.types.ts'
 
@@ -11,7 +11,7 @@ export async function getProducts(db: Db): Promise<Product[]> {
     .from('products')
     .select('id, canonical_name, brand, model, ean_gtin, category, created_at')
   if (error) throw error
-  // Mapeo snake_case (Postgres) -> camelCase (dominio @pgt/core).
+  // Mapeo snake_case (Postgres) -> camelCase (dominio @guateofertas/core).
   return data.map((row) => ({
     id: row.id,
     canonicalName: row.canonical_name,

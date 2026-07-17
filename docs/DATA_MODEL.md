@@ -14,6 +14,8 @@ erDiagram
     users ||--o{ notification_channels : "registra"
     products ||--o{ subscriptions : "es objetivo de"
     store_products ||--o{ match_review_queue : "pendiente de"
+    stores ||--o{ product_requests : "se pide traer de"
+    users ||--o{ product_requests : "solicita (opcional)"
 
     stores {
         uuid id PK
@@ -95,6 +97,16 @@ erDiagram
         text raw_name
         text suggested_product_id
         text status
+        timestamptz created_at
+    }
+
+    product_requests {
+        uuid id PK
+        uuid store_id FK
+        text url
+        text sku
+        text status
+        uuid requested_by FK
         timestamptz created_at
     }
 ```
@@ -195,6 +207,34 @@ Separar suscripción de canal permite agregar canales sin tocar las suscripcione
 | `status` | `text` | `pending` / `matched` / `new_product` / `ignored` |
 | `created_at` | `timestamptz` | |
 
+### `product_requests` — cola on-demand
+
+Lo que un usuario pide traer desde una tienda que la Edge Function `fetch-product` no resolvió en el fetch síncrono (ver [USER_FLOW.md](USER_FLOW.md) y [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)). Una fila = una tienda pendiente de scrapear para un producto/URL/SKU dado.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `store_id` | `uuid` FK → stores, nullable | la tienda a scrapear; nullable si todavía no se resuelve (ej. se encoló por `sku` sin tienda específica) |
+| `url` | `text` nullable | URL de producto si se conoce |
+| `sku` | `text` nullable | SKU si se conoce en vez de URL |
+| `status` | `text` | ciclo de estados, ver abajo |
+| `requested_by` | `uuid` FK → users, nullable | `null` cuando la solicitud vino de un usuario anónimo (permitido, con rate limit — ver [USER_FLOW.md](USER_FLOW.md)) |
+| `created_at` | `timestamptz` | |
+
+**Ciclo de estados** (convención de aplicación — la migración solo define `status text default 'pending'`; el dev-scraper es responsable de implementar las transiciones):
+
+```
+pending → processing → done
+                      → failed
+```
+
+- `pending`: la Edge Function encoló la fila; el collector todavía no la toma.
+- `processing`: el collector la tomó en la corrida actual (evita que dos corridas la procesen a la vez).
+- `done`: se insertó el `price_point` correspondiente para esa tienda.
+- `failed`: la captura falló (WAF, timeout, markup inesperado); **no** hay `price_point` nuevo — nunca se inventa uno para "cerrar" la fila.
+
+El índice parcial `idx_product_requests_pending` (sección 3) está pensado exactamente para el paso 1 del collector: encontrar rápido las filas en `pending` sin escanear toda la tabla.
+
 ## 3. Índices clave
 
 ```sql
@@ -210,6 +250,9 @@ CREATE UNIQUE INDEX idx_store_products_sku ON store_products (store_id, store_sk
 
 -- Cola de revisión pendiente
 CREATE INDEX idx_review_pending ON match_review_queue (status) WHERE status = 'pending';
+
+-- Cola on-demand pendiente: lo que el collector debe tomar en la siguiente corrida
+CREATE INDEX idx_product_requests_pending ON product_requests (status) WHERE status = 'pending';
 ```
 
 ## 4. Notas de crecimiento

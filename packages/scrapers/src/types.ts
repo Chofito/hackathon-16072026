@@ -3,7 +3,7 @@
 // para poder reutilizar la logica tanto en el collector (Bun) como en la
 // Edge Function on-demand (Deno). Ver docs/SCRAPING.md.
 
-import type { RawCapture, Store } from '@pgt/core'
+import type { RawCapture, Store } from '@guateofertas/core'
 
 /** Contexto de ejecucion inyectado a cada scraper (cortesia + config). */
 export interface ScrapeContext {

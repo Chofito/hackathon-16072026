@@ -6,7 +6,7 @@
 //   4. Encola el resto de tiendas en product_requests para que el collector complete.
 //   5. Responde el precio actual al instante.
 //
-// Reutiliza la logica PORTABLE de @pgt/core por import relativo (Deno importa TS local).
+// Reutiliza la logica PORTABLE de @guateofertas/core por import relativo (Deno importa TS local).
 // Correr local: `bun run fn:serve`  |  Deploy: `bun run fn:deploy`
 
 // @ts-nocheck — este archivo corre en Deno, no en el typecheck de Bun del monorepo.

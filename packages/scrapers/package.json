@@ -1,5 +1,5 @@
 {
-  "name": "@pgt/scrapers",
+  "name": "@guateofertas/scrapers",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pgt/core": "workspace:*"
+    "@guateofertas/core": "workspace:*"
   }
 }

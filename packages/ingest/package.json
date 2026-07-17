@@ -1,5 +1,5 @@
 {
-  "name": "@pgt/ingest",
+  "name": "@guateofertas/ingest",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pgt/core": "workspace:*",
-    "@pgt/db": "workspace:*"
+    "@guateofertas/core": "workspace:*",
+    "@guateofertas/db": "workspace:*"
   }
 }
