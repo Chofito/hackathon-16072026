@@ -34,6 +34,25 @@ function isProductUrl(url: string): boolean {
   return url.includes('/compras-en-linea/')
 }
 
+/** URLs de producto desde HTML de `index.php?route=product/search`. */
+export function parsePacifikoSearchProductUrls(html: string): string[] {
+  const hrefs = [
+    ...html.matchAll(/href="(\/compras-en-linea\/[^"]+)"/gi),
+    ...html.matchAll(/href="(https:\/\/www\.pacifiko\.com\/compras-en-linea\/[^"]+)"/gi),
+  ]
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const m of hrefs) {
+    const raw = m[1]
+    if (!raw) continue
+    const abs = raw.startsWith('http') ? raw : `${BASE}${raw}`
+    if (seen.has(abs)) continue
+    seen.add(abs)
+    out.push(abs)
+  }
+  return out
+}
+
 export const pacifikoScraper: Scraper = {
   key: 'pacifiko',
 
@@ -53,8 +72,11 @@ export const pacifikoScraper: Scraper = {
     return captureFromHtml(html, input.url)
   },
 
-  // MVP: search HTML no implementado aún.
-  search(_query: string, _ctx: ScrapeContext): Promise<string[]> {
-    return Promise.resolve([])
+  async search(query: string, ctx: ScrapeContext): Promise<string[]> {
+    const q = query.trim()
+    if (!q) return []
+    const url = `${BASE}/index.php?route=product/search&search=${encodeURIComponent(q)}`
+    const html = await politeGet(url, ctx)
+    return parsePacifikoSearchProductUrls(html)
   },
 }

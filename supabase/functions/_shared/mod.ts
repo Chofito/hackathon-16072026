@@ -16,7 +16,12 @@ export const MIN_DELAY_MS = 2500
 export const STALE_DAYS = 7
 export const CONFIDENT_SCORE = 0.85
 export const MIN_SLUG_SCORE = 0.34
+/** Score minimo de nombre tras fetchOne para incluir el match en la respuesta. */
+export const MIN_NAME_SCORE = 0.5
 export const TOP_CANDIDATES_CONFIRM = 5
+/** Max filas por pagina (supabase config.toml max_rows). */
+export const SITEMAP_PAGE_SIZE = 1000
+export const SITEMAP_MAX_PAGES = 5
 
 export type StoreKey = 'max' | 'kemik' | 'pacifiko' | 'curacao'
 

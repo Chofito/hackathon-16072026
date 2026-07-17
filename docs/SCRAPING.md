@@ -212,15 +212,17 @@ Todo corre localmente sin desplegar, con el monorepo Bun + Supabase CLI:
 
 | Tienda | URL de búsqueda | Estado |
 | --- | --- | --- |
-| MAX | `/search?q=…` → `productsList` en `__NEXT_DATA__` | ✅ implementado |
+| MAX | `/search?q=…` → `productsList` en `__NEXT_DATA__` | ✅ |
+| Pacifiko | `index.php?route=product/search&search=…` | ✅ |
+| Curacao | `/guatemala/search/<query>` | ✅ |
 | Kemik | buscador CSR | stub `[]` (fetch plano no ve resultados) |
-| Pacifiko / Curacao | rutas de búsqueda | stub `[]` (pendiente) |
 
 **Flujo en `find-matches`:**
 
-1. Rankear URLs del cache sitemap (tokens vs slug).
-2. Si no hay candidatos sobre umbral → `search(tokens.join(' '))` → rankear → confirmar con `fetchOne`.
-3. Query tokenizada (misma `tokenize` que el scoring), no la URL cruda.
+1. Filtrar `sitemap_urls` por tokens distintivos (`ilike`, paginado) — **no** cargar el sitemap entero (PostgREST `max_rows=1000` truncaba a basura alfabética).
+2. Rankear con penalización de accesorios (case/funda/…).
+3. Si hay <2 candidatos → `search(tokens distintivos)`.
+4. Confirmar con `fetchOne`; descartar si `nameScore < 0.5` (salvo EAN).
 
 **Excepción de robots:** las búsquedas vía `/search` se tratan como tráfico legítimo del usuario (comparador on-demand). Sigue aplicando cortesía (UA identificable + delay). El crawl batch **no** usa search; solo sitemaps.
 

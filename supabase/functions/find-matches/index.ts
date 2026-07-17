@@ -1,11 +1,16 @@
 // Edge Function: candidatos del mismo producto en otras tiendas.
-// Primero rankea cache sitemap_urls; si no hay candidatos, fallback a
-// Scraper.search (query tokenizada). Contrato: docs/EDGE_FUNCTIONS.md
+// Sitemap filtrado por tokens distintivos (evita truncate max_rows=1000) +
+// fallback/merge con Scraper.search. Contrato: docs/EDGE_FUNCTIONS.md
 //
 // @ts-nocheck — corre en Deno.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { scoreTokens, slugFromUrl, tokenize } from '../../../packages/core/src/scoring.ts'
+import {
+  pickDistinctiveTokens,
+  scoreTokens,
+  slugFromUrl,
+  tokenize,
+} from '../../../packages/core/src/scoring.ts'
 import { getScraper } from '../../../packages/scrapers/src/index.ts'
 import {
   ALL_STORE_KEYS,
@@ -14,7 +19,10 @@ import {
   handleCors,
   jsonResponse,
   makeScrapeContext,
+  MIN_NAME_SCORE,
   MIN_SLUG_SCORE,
+  SITEMAP_MAX_PAGES,
+  SITEMAP_PAGE_SIZE,
   STALE_DAYS,
   storeKeyFromUrl,
   TOP_CANDIDATES_CONFIRM,
@@ -47,7 +55,40 @@ function rankUrls(query: Set<string>, urls: string[]) {
 }
 
 function searchQueryFromTokens(tokens: Set<string>): string {
-  return [...tokens].join(' ')
+  const distinctive = pickDistinctiveTokens(tokens, 5)
+  return (distinctive.length > 0 ? distinctive : [...tokens]).join(' ')
+}
+
+/**
+ * Carga URLs del cache filtrando por tokens distintivos y paginando.
+ * Sin filtro, PostgREST truncaba a 1000 filas alfabéticas (basura en Pacifiko).
+ */
+async function fetchSitemapCandidates(
+  supabase: ReturnType<typeof createClient>,
+  storeKey: StoreKey,
+  query: Set<string>,
+): Promise<string[]> {
+  const tokens = pickDistinctiveTokens(query, 3)
+  if (tokens.length === 0) return []
+
+  const urls: string[] = []
+  const orFilter = tokens.map((t) => `url.ilike.%${t}%`).join(',')
+
+  for (let page = 0; page < SITEMAP_MAX_PAGES; page++) {
+    const from = page * SITEMAP_PAGE_SIZE
+    const to = from + SITEMAP_PAGE_SIZE - 1
+    const { data, error } = await supabase
+      .from('sitemap_urls')
+      .select('url')
+      .eq('store_key', storeKey)
+      .or(orFilter)
+      .range(from, to)
+    if (error) throw error
+    if (!data?.length) break
+    for (const row of data) urls.push(row.url)
+    if (data.length < SITEMAP_PAGE_SIZE) break
+  }
+  return urls
 }
 
 Deno.serve(async (req: Request) => {
@@ -116,26 +157,24 @@ Deno.serve(async (req: Request) => {
       const cacheFresh =
         !!sample?.refreshed_at && new Date(sample.refreshed_at).getTime() >= staleCutoff
 
-      let candidateUrls: string[] = []
+      const candidateUrls = new Set<string>()
       if (cacheFresh) {
-        const { data: rows, error } = await supabase
-          .from('sitemap_urls')
-          .select('url')
-          .eq('store_key', key)
-        if (error) throw error
-        candidateUrls = (rows ?? []).map((r: { url: string }) => r.url)
+        for (const u of await fetchSitemapCandidates(supabase, key, query)) {
+          candidateUrls.add(u)
+        }
       }
 
-      let ranked = rankUrls(query, candidateUrls)
+      let ranked = rankUrls(query, [...candidateUrls])
 
-      // Fallback: buscador HTML de la tienda (query tokenizada).
+      // Search: fallback si sitemap no da, o refuerzo si hay pocos candidatos.
       const ctx = makeScrapeContext(key)
-      if (ranked.length === 0 && searchQuery) {
+      if (ranked.length < 2 && searchQuery) {
         try {
           const searchUrls = await scraper.search(searchQuery, ctx)
-          ranked = rankUrls(query, searchUrls)
+          for (const u of searchUrls) candidateUrls.add(u)
+          ranked = rankUrls(query, [...candidateUrls])
         } catch {
-          ranked = []
+          /* search opcional */
         }
       }
 
@@ -151,6 +190,7 @@ Deno.serve(async (req: Request) => {
           )
           const nameScore = scoreTokens(query, tokenize(capture.rawName))
           const score = eanMatch ? 1 : nameScore
+          if (!eanMatch && score < MIN_NAME_SCORE) continue
           confirmed.push({
             url: capture.url,
             score,
@@ -159,7 +199,7 @@ Deno.serve(async (req: Request) => {
             product: captureToDto(key, capture),
           })
         } catch {
-          // Candidato fallido: se omite (match incorrecto peor que faltante).
+          // Candidato fallido: se omite.
         }
       }
 

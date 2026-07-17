@@ -51,6 +51,26 @@ function isProductUrl(url: string): boolean {
   }
 }
 
+/** URLs de producto desde HTML de `/guatemala/search/<query>`. */
+export function parseCuracaoSearchProductUrls(html: string): string[] {
+  const hrefs = [
+    ...html.matchAll(/href="(https:\/\/www\.lacuracaonline\.com\/guatemala\/[^"]+\/p)"/gi),
+    ...html.matchAll(/href="(\/guatemala\/[^"]+\/p)"/gi),
+  ]
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const m of hrefs) {
+    const raw = m[1]
+    if (!raw) continue
+    if (raw.includes('/guatemala/c/p')) continue
+    const abs = raw.startsWith('http') ? raw : `https://www.lacuracaonline.com${raw}`
+    if (seen.has(abs)) continue
+    seen.add(abs)
+    out.push(abs)
+  }
+  return out
+}
+
 export const curacaoScraper: Scraper = {
   key: 'curacao',
 
@@ -70,8 +90,13 @@ export const curacaoScraper: Scraper = {
     return captureFromHtml(html, url)
   },
 
-  // MVP: search HTML no implementado aún.
-  search(_query: string, _ctx: ScrapeContext): Promise<string[]> {
-    return Promise.resolve([])
+  async search(query: string, ctx: ScrapeContext): Promise<string[]> {
+    const q = query.trim()
+    if (!q) return []
+    // Curacao usa path `/guatemala/search/<slug>` (espacios → -).
+    const slug = encodeURIComponent(q.replace(/\s+/g, '-').toLowerCase())
+    const url = `https://www.lacuracaonline.com/guatemala/search/${slug}`
+    const html = await politeGet(url, ctx)
+    return parseCuracaoSearchProductUrls(html)
   },
 }
