@@ -5,7 +5,7 @@ import type { Product, ProductBestPrice } from '@/lib/queries'
 import { TRACKED_CATEGORIES } from '@/lib/queries'
 import { categoryLabel } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { ProductCard } from '@/components/product-card'
+import { CatalogSearch } from '@/components/catalog-search'
 import { EmptyState } from '@/components/empty-state'
 
 interface ProductGridProps {
@@ -59,15 +59,14 @@ export function ProductGrid({ products, bestPrices, activeCategory }: ProductGri
           description="El colector está arrancando: ya tenemos el catálogo curado, pronto vas a ver precios de las 4 tiendas aquí."
         />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              bestPrice={bestPrices?.get(product.id)}
-            />
-          ))}
-        </ul>
+        <CatalogSearch
+          products={products}
+          bestPrices={
+            bestPrices
+              ? Object.fromEntries(bestPrices.entries())
+              : undefined
+          }
+        />
       )}
     </section>
   )

@@ -52,4 +52,9 @@ export const pacifikoScraper: Scraper = {
     const html = await politeGet(input.url, ctx)
     return captureFromHtml(html, input.url)
   },
+
+  // MVP: search HTML no implementado aún.
+  search(_query: string, _ctx: ScrapeContext): Promise<string[]> {
+    return Promise.resolve([])
+  },
 }

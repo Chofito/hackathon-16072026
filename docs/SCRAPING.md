@@ -206,26 +206,23 @@ Todo corre localmente sin desplegar, con el monorepo Bun + Supabase CLI:
 - **POC de matching:** `bun run poc/find-matches.ts <url>` (ver [../poc/README.md](../poc/README.md)) para validar extracción + matching cross-store sin tocar la DB.
 - Credenciales vía `.env` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`); nunca hardcodeadas. Ver `.env.example`.
 
-### 6.4 Búsqueda por texto (query) — qué sí y qué no
+### 6.4 Búsqueda por texto (query)
 
-La interfaz `Scraper` **no** tiene un método `search(query)` hoy. Tampoco se usa el buscador HTML de las tiendas:
+`Scraper.search(query)` consulta el buscador HTML de la tienda. Se usa como **fallback** en `find-matches` cuando el ranking sobre `sitemap_urls` no produce candidatos.
 
-| Tienda | URL de búsqueda típica | ¿Usable? | Motivo |
-| --- | --- | --- | --- |
-| MAX | `/search?q=zelda` | **No** | `robots.txt` → `Disallow: /search?q*` (también `/catalogsearch/result?q*`). Técnicamente el SSR trae `productsList` en `__NEXT_DATA__`, pero **respetamos robots**. |
-| Kemik | buscador del site | **No** | Resultados renderizados en cliente (CSR); `fetch` plano no ve productos. |
-| Pacifiko / Curacao | rutas de búsqueda | **No** | Prohibidas o frágiles en `robots.txt`. |
+| Tienda | URL de búsqueda | Estado |
+| --- | --- | --- |
+| MAX | `/search?q=…` → `productsList` en `__NEXT_DATA__` | ✅ implementado |
+| Kemik | buscador CSR | stub `[]` (fetch plano no ve resultados) |
+| Pacifiko / Curacao | rutas de búsqueda | stub `[]` (pendiente) |
 
-**Cómo se busca por texto hoy (sin LLM, robots-safe):**
+**Flujo en `find-matches`:**
 
-1. Descargar el **sitemap de producto** de la tienda (permitido).
-2. Rankear URLs por coincidencia de tokens contra la query / nombre fuente (marca + modelo + specs).
-3. Confirmar los top-N con `fetchOne` / extracción de la página de producto.
-4. Si el fuente trae EAN/GTIN y el candidato también, boost a score 1.0 (capa 1 de §7).
+1. Rankear URLs del cache sitemap (tokens vs slug).
+2. Si no hay candidatos sobre umbral → `search(tokens.join(' '))` → rankear → confirmar con `fetchOne`.
+3. Query tokenizada (misma `tokenize` que el scoring), no la URL cruda.
 
-Eso es exactamente lo que hace el POC (`bun run poc/find-matches.ts <url>`). Un futuro `Scraper.search(query)` debería encapsular ese flujo (filtrar sitemap localmente), **nunca** pegarle a `/search?q=…`.
-
-El **SKU interno no cruza** entre tiendas (`NSW2US` ≠ `820217`). Solo el EAN/GTIN (cuando existe) o la normalización marca+modelo sirven para join cross-store.
+**Excepción de robots:** las búsquedas vía `/search` se tratan como tráfico legítimo del usuario (comparador on-demand). Sigue aplicando cortesía (UA identificable + delay). El crawl batch **no** usa search; solo sitemaps.
 
 Reportes de corridas: [../examples/cross-store-report.md](../examples/cross-store-report.md). Capturas `RawCapture` de ejemplo: [../examples/captures/](../examples/captures/).
 

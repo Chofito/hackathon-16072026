@@ -24,6 +24,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   consolas: 'Consolas',
   gpus: 'Tarjetas gráficas',
   celulares: 'Celulares',
+  electrodomesticos: 'Electrodomésticos',
 }
 
 export function categoryLabel(category: string): string {

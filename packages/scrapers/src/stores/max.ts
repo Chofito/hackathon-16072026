@@ -27,17 +27,37 @@ interface MaxNextProduct {
   }
 }
 
-function nextDataProduct(html: string): MaxNextProduct | null {
+function nextDataPayload(html: string): unknown | null {
   const m = /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/.exec(html)
   if (!m?.[1]) return null
   try {
-    const data = JSON.parse(m[1]) as {
-      props?: { pageProps?: { product?: MaxNextProduct } }
-    }
-    return data.props?.pageProps?.product ?? null
+    return JSON.parse(m[1])
   } catch {
     return null
   }
+}
+
+function nextDataProduct(html: string): MaxNextProduct | null {
+  const data = nextDataPayload(html) as {
+    props?: { pageProps?: { product?: MaxNextProduct } }
+  } | null
+  return data?.props?.pageProps?.product ?? null
+}
+
+/** Extrae URLs de producto del HTML de `/search?q=…` (productsList en SSR). */
+export function parseMaxSearchProductUrls(html: string): string[] {
+  const data = nextDataPayload(html) as {
+    props?: { pageProps?: { productsList?: Array<{ slug?: string }> } }
+  } | null
+  const list = data?.props?.pageProps?.productsList
+  if (!Array.isArray(list)) return []
+  const urls: string[] = []
+  for (const item of list) {
+    const slug = item?.slug?.trim()
+    if (!slug) continue
+    urls.push(`${BASE}/${slug}`)
+  }
+  return urls
 }
 
 function captureFromHtml(html: string, url: string): RawCapture | null {
@@ -109,5 +129,13 @@ export const maxScraper: Scraper = {
     if (!url) return null
     const html = await politeGet(url, ctx)
     return captureFromHtml(html, url)
+  },
+
+  async search(query: string, ctx: ScrapeContext): Promise<string[]> {
+    const q = query.trim()
+    if (!q) return []
+    const url = `${BASE}/search?q=${encodeURIComponent(q)}`
+    const html = await politeGet(url, ctx)
+    return parseMaxSearchProductUrls(html)
   },
 }

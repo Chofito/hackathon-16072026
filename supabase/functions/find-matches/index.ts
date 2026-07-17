@@ -1,6 +1,6 @@
 // Edge Function: candidatos del mismo producto en otras tiendas.
-// Usa cache sitemap_urls (no baja sitemaps en el request).
-// Contrato: docs/EDGE_FUNCTIONS.md
+// Primero rankea cache sitemap_urls; si no hay candidatos, fallback a
+// Scraper.search (query tokenizada). Contrato: docs/EDGE_FUNCTIONS.md
 //
 // @ts-nocheck — corre en Deno.
 
@@ -33,6 +33,21 @@ interface MatchItem {
   confident: boolean
   eanMatch: boolean
   product: ProductDto
+}
+
+function rankUrls(query: Set<string>, urls: string[]) {
+  return urls
+    .map((u) => ({
+      url: u,
+      slugScore: scoreTokens(query, tokenize(slugFromUrl(u))),
+    }))
+    .filter((c) => c.slugScore >= MIN_SLUG_SCORE)
+    .sort((a, b) => b.slugScore - a.slugScore)
+    .slice(0, TOP_CANDIDATES_CONFIRM)
+}
+
+function searchQueryFromTokens(tokens: Set<string>): string {
+  return [...tokens].join(' ')
 }
 
 Deno.serve(async (req: Request) => {
@@ -77,63 +92,54 @@ Deno.serve(async (req: Request) => {
     }
     const source = captureToDto(sourceKey, sourceCapture)
     const query = tokenize(sourceCapture.rawName)
+    const searchQuery = searchQueryFromTokens(query)
 
     const destinations = ALL_STORE_KEYS.filter((k) => k !== sourceKey)
     const staleCutoff = Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000
-    const staleStores: StoreKey[] = []
-
-    for (const key of destinations) {
-      const { data: sample, error } = await supabase
-        .from('sitemap_urls')
-        .select('refreshed_at')
-        .eq('store_key', key)
-        .limit(1)
-        .maybeSingle()
-
-      if (error) throw error
-      if (!sample?.refreshed_at || new Date(sample.refreshed_at).getTime() < staleCutoff) {
-        staleStores.push(key)
-      }
-    }
-
-    if (staleStores.length > 0) {
-      return jsonResponse(
-        { error: 'sitemap_cache_stale', stores: staleStores },
-        503,
-      )
-    }
-
     const matches: Record<string, MatchItem[]> = {}
 
     for (const key of destinations) {
-      const { data: rows, error } = await supabase
-        .from('sitemap_urls')
-        .select('url')
-        .eq('store_key', key)
-
-      if (error) throw error
-      const urls = (rows ?? []).map((r: { url: string }) => r.url)
-
-      const ranked = urls
-        .map((u: string) => ({
-          url: u,
-          slugScore: scoreTokens(query, tokenize(slugFromUrl(u))),
-        }))
-        .filter((c: { slugScore: number }) => c.slugScore >= MIN_SLUG_SCORE)
-        .sort(
-          (a: { slugScore: number }, b: { slugScore: number }) => b.slugScore - a.slugScore,
-        )
-        .slice(0, TOP_CANDIDATES_CONFIRM)
-
       const scraper = getScraper(key)
       if (!scraper) {
         matches[key] = []
         continue
       }
 
-      const ctx = makeScrapeContext(key)
-      const confirmed: MatchItem[] = []
+      const { data: sample, error: sampleError } = await supabase
+        .from('sitemap_urls')
+        .select('refreshed_at')
+        .eq('store_key', key)
+        .limit(1)
+        .maybeSingle()
+      if (sampleError) throw sampleError
 
+      const cacheFresh =
+        !!sample?.refreshed_at && new Date(sample.refreshed_at).getTime() >= staleCutoff
+
+      let candidateUrls: string[] = []
+      if (cacheFresh) {
+        const { data: rows, error } = await supabase
+          .from('sitemap_urls')
+          .select('url')
+          .eq('store_key', key)
+        if (error) throw error
+        candidateUrls = (rows ?? []).map((r: { url: string }) => r.url)
+      }
+
+      let ranked = rankUrls(query, candidateUrls)
+
+      // Fallback: buscador HTML de la tienda (query tokenizada).
+      const ctx = makeScrapeContext(key)
+      if (ranked.length === 0 && searchQuery) {
+        try {
+          const searchUrls = await scraper.search(searchQuery, ctx)
+          ranked = rankUrls(query, searchUrls)
+        } catch {
+          ranked = []
+        }
+      }
+
+      const confirmed: MatchItem[] = []
       for (const candidate of ranked) {
         try {
           const capture = await scraper.fetchOne({ url: candidate.url }, ctx)

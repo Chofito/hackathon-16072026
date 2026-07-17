@@ -23,7 +23,7 @@ flowchart LR
   refresh["refresh-sitemaps (Bun)"] -->|"upsert"| cache
 ```
 
-`find-matches` **no** baja sitemaps en el request (timeout + cortesía). El cache lo llena `bun run refresh-sitemaps`.
+`find-matches` **no** baja sitemaps en el request (timeout + cortesía). El cache lo llena `bun run refresh-sitemaps`. Si el ranking del cache no da candidatos, hace fallback a `Scraper.search` (query tokenizada; MAX implementado).
 
 ## Contrato JSON
 
@@ -78,7 +78,7 @@ Ambas: `POST`, `Content-Type: application/json`, CORS habilitado. Shape de produ
 
 - `confident`: `score >= 0.85` o `eanMatch`.
 - Array vacío = sin candidatos sobre el umbral mínimo (no inventar matches).
-- Cache vacío/stale (>7 días): `503` `{ "error": "sitemap_cache_stale", "stores": ["pacifiko"] }`.
+- Sin cache fresco: se omite el ranking sitemap y se intenta `search` si la tienda lo implementa.
 
 ## Cache `sitemap_urls`
 

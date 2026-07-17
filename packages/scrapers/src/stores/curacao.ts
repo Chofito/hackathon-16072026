@@ -69,4 +69,9 @@ export const curacaoScraper: Scraper = {
     const html = await politeGet(url, ctx)
     return captureFromHtml(html, url)
   },
+
+  // MVP: search HTML no implementado aún.
+  search(_query: string, _ctx: ScrapeContext): Promise<string[]> {
+    return Promise.resolve([])
+  },
 }

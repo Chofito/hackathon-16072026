@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -15,16 +15,27 @@ import { Button } from '@/components/ui/button'
 import { getSupabase } from '@/lib/supabase'
 import { formatGTQ } from '@/lib/format'
 import { resolveTrackedUrl } from '@/lib/actions'
+import {
+  type FindMatchesResponse,
+  type MatchItem,
+  type ProductDto,
+  invokeEdge,
+  isEdgeError,
+  isFindMatchesResponse,
+  isProductDto,
+  storeKeyLabel,
+} from '@/lib/edge-functions'
 import { SUPPORTED_STORES, looksLikeUrl, matchSupportedStore, normalizeUrl } from '@/lib/stores'
 
 type OnDemandResult =
   | { kind: 'invalid' }
   | { kind: 'unsupported' }
   | { kind: 'checking'; storeName: string }
-  | { kind: 'pending'; storeName: string }
-  | { kind: 'success'; storeName: string; price: number }
-  | { kind: 'partial'; storeName: string }
-  | { kind: 'error'; storeName: string }
+  | { kind: 'fetching'; storeName: string }
+  | { kind: 'matching'; storeName: string; source: ProductDto }
+  | { kind: 'found'; source: ProductDto; matches: FindMatchesResponse['matches'] }
+  | { kind: 'stale'; stores: string[] }
+  | { kind: 'error'; storeName: string; message?: string }
 
 const SUPPORTED_STORE_NAMES = SUPPORTED_STORES.map((store) => store.name).join(', ')
 
@@ -33,7 +44,10 @@ export function HeroSearch() {
   const inputId = useId()
   const [value, setValue] = useState('')
   const [result, setResult] = useState<OnDemandResult | null>(null)
-  const isBusy = result?.kind === 'checking' || result?.kind === 'pending'
+  const isBusy =
+    result?.kind === 'checking' ||
+    result?.kind === 'fetching' ||
+    result?.kind === 'matching'
 
   async function runLookup(rawValue: string, storeName: string) {
     const url = normalizeUrl(rawValue)
@@ -45,29 +59,57 @@ export function HeroSearch() {
       return
     }
 
-    setResult({ kind: 'pending', storeName })
-    try {
-      const supabase = getSupabase()
-      const { data, error } = await supabase.functions.invoke('fetch-product', {
-        body: { url },
-      })
-      if (error) throw error
+    setResult({ kind: 'fetching', storeName })
+    const supabase = getSupabase()
 
-      const payload = data as
-        | { parsed?: { price?: number | null } | null; productId?: string; product_id?: string }
-        | null
-      const productId = payload?.productId ?? payload?.product_id
-      if (typeof productId === 'string' && productId) {
-        router.push(`/producto/${productId}`)
+    try {
+      const { data: fetchData, networkError: fetchNet } = await invokeEdge(
+        supabase,
+        'fetch-product',
+        { url },
+      )
+      if (fetchNet) {
+        setResult({ kind: 'error', storeName })
+        return
+      }
+      if (isEdgeError(fetchData)) {
+        setResult({ kind: 'error', storeName, message: fetchData.error })
+        return
+      }
+      if (!isProductDto(fetchData)) {
+        setResult({ kind: 'error', storeName })
         return
       }
 
-      const price = payload?.parsed?.price
-      if (typeof price === 'number') {
-        setResult({ kind: 'success', storeName, price })
-      } else {
-        setResult({ kind: 'partial', storeName })
+      setResult({ kind: 'matching', storeName, source: fetchData })
+
+      const { data: matchData, networkError: matchNet } = await invokeEdge(
+        supabase,
+        'find-matches',
+        { url, topN: 3 },
+      )
+      if (matchNet) {
+        setResult({ kind: 'error', storeName })
+        return
       }
+      if (isEdgeError(matchData)) {
+        if (matchData.error === 'sitemap_cache_stale' && matchData.stores?.length) {
+          setResult({ kind: 'stale', stores: matchData.stores })
+          return
+        }
+        setResult({ kind: 'error', storeName, message: matchData.error })
+        return
+      }
+      if (!isFindMatchesResponse(matchData)) {
+        setResult({ kind: 'error', storeName })
+        return
+      }
+
+      setResult({
+        kind: 'found',
+        source: matchData.source,
+        matches: matchData.matches,
+      })
     } catch {
       setResult({ kind: 'error', storeName })
     }
@@ -127,7 +169,11 @@ export function HeroSearch() {
                 aria-hidden="true"
                 className="animate-spin motion-reduce:animate-none"
               />
-              {result?.kind === 'checking' ? 'Verificando…' : 'Consultando…'}
+              {result?.kind === 'checking'
+                ? 'Verificando…'
+                : result?.kind === 'fetching'
+                  ? 'Consultando…'
+                  : 'Buscando…'}
             </>
           ) : (
             'Comparar precios'
@@ -145,102 +191,146 @@ export function HeroSearch() {
 function OnDemandStatus({ result }: { result: OnDemandResult }) {
   if (result.kind === 'invalid') {
     return (
-      <p className="flex items-start gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        <HugeiconsIcon
-          icon={Alert02Icon}
-          size={18}
-          aria-hidden="true"
-          className="mt-0.5 shrink-0 text-primary"
-        />
-        <span>
-          Eso no parece un link. Pegá la URL completa de un producto de{' '}
-          <strong className="text-foreground">{SUPPORTED_STORE_NAMES}</strong>.
-        </span>
-      </p>
+      <StatusCard tone="muted">
+        Eso no parece un link. Pegá la URL completa de un producto de{' '}
+        <strong className="text-foreground">{SUPPORTED_STORE_NAMES}</strong>.
+      </StatusCard>
     )
   }
 
   if (result.kind === 'unsupported') {
     return (
-      <p className="flex items-start gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        <HugeiconsIcon
-          icon={Alert02Icon}
-          size={18}
-          aria-hidden="true"
-          className="mt-0.5 shrink-0 text-primary"
-        />
-        <span>
-          Por ahora solo comparamos precios de{' '}
-          <strong className="text-foreground">{SUPPORTED_STORE_NAMES}</strong>. Pegá un link de
-          alguna de esas tiendas.
-        </span>
-      </p>
+      <StatusCard tone="muted">
+        Por ahora solo comparamos precios de{' '}
+        <strong className="text-foreground">{SUPPORTED_STORE_NAMES}</strong>.
+      </StatusCard>
     )
   }
 
-  if (result.kind === 'checking') {
+  if (result.kind === 'checking' || result.kind === 'fetching' || result.kind === 'matching') {
+    const label =
+      result.kind === 'checking'
+        ? 'Viendo si ya tenemos ese producto…'
+        : result.kind === 'fetching'
+          ? `Consultando ${result.storeName}…`
+          : `Buscando en otras tiendas… (${result.source.rawName})`
     return (
-      <p className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        <HugeiconsIcon
-          icon={Loading03Icon}
-          size={18}
-          aria-hidden="true"
-          className="shrink-0 animate-spin text-primary motion-reduce:animate-none"
-        />
-        Viendo si ya tenemos ese producto…
-      </p>
+      <StatusCard tone="muted" loading>
+        {label}
+      </StatusCard>
     )
   }
 
-  if (result.kind === 'pending') {
+  if (result.kind === 'stale') {
     return (
-      <p className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-        <HugeiconsIcon
-          icon={Loading03Icon}
-          size={18}
-          aria-hidden="true"
-          className="shrink-0 animate-spin text-primary motion-reduce:animate-none"
-        />
-        Consultando {result.storeName}…
-      </p>
+      <StatusCard tone="error">
+        El índice de productos aún no está listo para{' '}
+        {result.stores.map(storeKeyLabel).join(', ')}. Probá de nuevo en unos minutos.
+      </StatusCard>
     )
   }
 
-  if (result.kind === 'success') {
+  if (result.kind === 'error') {
     return (
-      <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-secondary px-4 py-3 text-sm text-secondary-foreground">
-        <HugeiconsIcon
-          icon={CheckmarkCircle02Icon}
-          size={18}
-          aria-hidden="true"
-          className="mt-0.5 shrink-0 text-primary"
-        />
-        <span>
-          Precio de {result.storeName}: <strong className="text-coral-ink tabular-nums">{formatGTQ(result.price)}</strong>{' '}
-          — buscando en las otras tiendas…
-        </span>
-      </p>
+      <StatusCard tone="error">
+        {result.message
+          ? `No pudimos completar la búsqueda: ${result.message}`
+          : `No pudimos leer ${result.storeName} ahora mismo. Probá de nuevo en unos minutos.`}
+      </StatusCard>
     )
   }
 
-  if (result.kind === 'partial') {
-    return (
-      <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-secondary px-4 py-3 text-sm text-secondary-foreground">
-        <HugeiconsIcon
-          icon={CheckmarkCircle02Icon}
-          size={18}
-          aria-hidden="true"
-          className="mt-0.5 shrink-0 text-primary"
-        />
-        <span>Encontramos {result.storeName} — buscando en las otras tiendas…</span>
-      </p>
-    )
-  }
+  return <FoundResults source={result.source} matches={result.matches} />
+}
+
+function FoundResults({
+  source,
+  matches,
+}: {
+  source: ProductDto
+  matches: FindMatchesResponse['matches']
+}) {
+  const otherStores = Object.entries(matches).filter(([, items]) => items.length > 0)
 
   return (
-    <p className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-      <HugeiconsIcon icon={Alert02Icon} size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
-      <span>No pudimos leer {result.storeName} ahora mismo. Probá de nuevo en unos minutos.</span>
+    <div className="space-y-3 rounded-lg border border-primary/30 bg-secondary px-4 py-3 text-sm text-secondary-foreground">
+      <p className="flex items-start gap-2">
+        <HugeiconsIcon
+          icon={CheckmarkCircle02Icon}
+          size={18}
+          aria-hidden="true"
+          className="mt-0.5 shrink-0 text-primary"
+        />
+        <span>
+          <strong className="text-foreground">{source.rawName}</strong>
+          <br />
+          {storeKeyLabel(source.store)}:{' '}
+          <strong className="text-coral-ink tabular-nums">{formatGTQ(source.price)}</strong>
+        </span>
+      </p>
+
+      {otherStores.length === 0 ? (
+        <p className="text-muted-foreground">Sin coincidencias claras en las otras tiendas.</p>
+      ) : (
+        <ul className="space-y-2 border-t border-primary/20 pt-3">
+          {otherStores.map(([storeKey, items]) => (
+            <li key={storeKey}>
+              <p className="font-medium text-foreground">{storeKeyLabel(storeKey)}</p>
+              <ul className="mt-1 space-y-1">
+                {items.map((item) => (
+                  <MatchRow key={item.url} item={item} />
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function MatchRow({ item }: { item: MatchItem }) {
+  const flag = item.confident ? '✓' : '?'
+  return (
+    <li className="flex flex-wrap items-baseline gap-x-2 text-muted-foreground">
+      <span aria-hidden="true">{flag}</span>
+      <span className="tabular-nums text-foreground">{formatGTQ(item.product.price)}</span>
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="min-w-0 truncate text-primary underline-offset-2 hover:underline"
+      >
+        {item.product.rawName}
+      </a>
+    </li>
+  )
+}
+
+function StatusCard({
+  children,
+  tone,
+  loading,
+}: {
+  children: ReactNode
+  tone: 'muted' | 'error'
+  loading?: boolean
+}) {
+  const icon = loading ? Loading03Icon : Alert02Icon
+  const base =
+    tone === 'error'
+      ? 'border-destructive/30 bg-destructive/10 text-destructive'
+      : 'border-border bg-card text-muted-foreground'
+
+  return (
+    <p className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${base}`}>
+      <HugeiconsIcon
+        icon={icon}
+        size={18}
+        aria-hidden="true"
+        className={`mt-0.5 shrink-0 ${loading ? 'animate-spin text-primary motion-reduce:animate-none' : tone === 'error' ? '' : 'text-primary'}`}
+      />
+      <span>{children}</span>
     </p>
   )
 }

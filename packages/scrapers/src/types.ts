@@ -37,6 +37,7 @@ export interface FetchOneInput {
  * - `listProductUrls`: descubre URLs via sitemap (para cache / batch).
  * - `scrape`: ciclo completo (sitemap -> capturas) para el cron.
  * - `fetchOne`: un solo producto para el flujo on-demand del usuario.
+ * - `search`: buscador HTML de la tienda (fallback de find-matches).
  */
 export interface Scraper {
   /** Clave de la tienda, ej. 'max'. Debe existir un `stores.name` asociado. */
@@ -44,4 +45,6 @@ export interface Scraper {
   listProductUrls(ctx: ScrapeContext): Promise<string[]>
   scrape(ctx: ScrapeContext): Promise<ScrapeResult>
   fetchOne(input: FetchOneInput, ctx: ScrapeContext): Promise<RawCapture | null>
+  /** URLs de producto desde el search de la tienda. `[]` si no hay parser. */
+  search(query: string, ctx: ScrapeContext): Promise<string[]>
 }

@@ -108,4 +108,9 @@ export const kemikScraper: Scraper = {
     const html = await politeGet(url, ctx)
     return captureFromHtml(html, url)
   },
+
+  // MVP: Kemik search es CSR — fetch plano no ve resultados.
+  search(_query: string, _ctx: ScrapeContext): Promise<string[]> {
+    return Promise.resolve([])
+  },
 }
