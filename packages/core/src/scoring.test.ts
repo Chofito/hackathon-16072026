@@ -18,6 +18,16 @@ describe('pickDistinctiveTokens', () => {
     const d = pickDistinctiveTokens(q)
     expect(d[0]).toBe('qn55q6faa')
   })
+
+  test('prioriza 2200va sobre palabras genericas del regulador', () => {
+    const q = tokenize(
+      'Regulador automatico De Voltaje FORZA De 2200VA / 1100W / 8 Salidas y 120V',
+    )
+    const d = pickDistinctiveTokens(q, 3)
+    expect(d).toContain('2200va')
+    expect(d).not.toContain('salidas')
+    expect(d).not.toContain('automatico')
+  })
 })
 
 describe('scoreTokens accessory penalty', () => {

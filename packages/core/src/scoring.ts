@@ -26,9 +26,11 @@ function stripAccents(s: string): string {
 }
 
 /** Tokens que identifican el modelo concreto (letra+digitos o digito de version). */
-function isModelToken(t: string): boolean {
+export function isModelToken(t: string): boolean {
   if (/^[a-z]{1,4}\d{1,4}[a-z0-9]*$/i.test(t)) return true
   if (/^\d$/.test(t)) return true
+  // Capacidades / VA: 2200va, 1100w, 128gb
+  if (/^\d+[a-z][a-z0-9]*$/i.test(t) && t.length >= 3) return true
   // SKUs largos tipo qn55q6faa / fvr2201m
   if (/^[a-z]+\d+[a-z0-9]+$/i.test(t) && t.length >= 5) return true
   return false

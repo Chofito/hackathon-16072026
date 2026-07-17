@@ -6,6 +6,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import {
+  isModelToken,
   pickDistinctiveTokens,
   scoreTokens,
   slugFromUrl,
@@ -59,9 +60,27 @@ function searchQueryFromTokens(tokens: Set<string>): string {
   return (distinctive.length > 0 ? distinctive : [...tokens]).join(' ')
 }
 
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'string') return err
+  if (err && typeof err === 'object') {
+    const o = err as { message?: unknown; error?: unknown; code?: unknown }
+    if (typeof o.message === 'string') return o.message
+    if (typeof o.error === 'string') return o.error
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return 'error desconocido'
+    }
+  }
+  return String(err)
+}
+
 /**
  * Carga URLs del cache filtrando por tokens distintivos y paginando.
  * Sin filtro, PostgREST truncaba a 1000 filas alfabéticas (basura en Pacifiko).
+ * Ante error de DB (timeout ilike sobre catálogos grandes) devolvemos [] y
+ * dejamos que el search fallback continúe.
  */
 async function fetchSitemapCandidates(
   supabase: ReturnType<typeof createClient>,
@@ -69,24 +88,35 @@ async function fetchSitemapCandidates(
   query: Set<string>,
 ): Promise<string[]> {
   const tokens = pickDistinctiveTokens(query, 3)
-  if (tokens.length === 0) return []
+  // Si hay tokens de modelo (2200va, qn55…), no mezclar con palabras genéricas
+  // en el OR — eso hincha el result set y hace timeout en Pacifiko.
+  const modelTokens = tokens.filter((t) => isModelToken(t) && !/^\d$/.test(t))
+  const filterTokens = modelTokens.length > 0 ? modelTokens.slice(0, 2) : tokens
+  if (filterTokens.length === 0) return []
 
   const urls: string[] = []
-  const orFilter = tokens.map((t) => `url.ilike.%${t}%`).join(',')
+  const orFilter = filterTokens.map((t) => `url.ilike.%${t}%`).join(',')
 
-  for (let page = 0; page < SITEMAP_MAX_PAGES; page++) {
-    const from = page * SITEMAP_PAGE_SIZE
-    const to = from + SITEMAP_PAGE_SIZE - 1
-    const { data, error } = await supabase
-      .from('sitemap_urls')
-      .select('url')
-      .eq('store_key', storeKey)
-      .or(orFilter)
-      .range(from, to)
-    if (error) throw error
-    if (!data?.length) break
-    for (const row of data) urls.push(row.url)
-    if (data.length < SITEMAP_PAGE_SIZE) break
+  try {
+    for (let page = 0; page < SITEMAP_MAX_PAGES; page++) {
+      const from = page * SITEMAP_PAGE_SIZE
+      const to = from + SITEMAP_PAGE_SIZE - 1
+      const { data, error } = await supabase
+        .from('sitemap_urls')
+        .select('url')
+        .eq('store_key', storeKey)
+        .or(orFilter)
+        .range(from, to)
+      if (error) {
+        console.error(`[find-matches] sitemap ${storeKey}:`, errorMessage(error))
+        return urls
+      }
+      if (!data?.length) break
+      for (const row of data) urls.push(row.url)
+      if (data.length < SITEMAP_PAGE_SIZE) break
+    }
+  } catch (err) {
+    console.error(`[find-matches] sitemap ${storeKey}:`, errorMessage(err))
   }
   return urls
 }
@@ -152,7 +182,11 @@ Deno.serve(async (req: Request) => {
         .eq('store_key', key)
         .limit(1)
         .maybeSingle()
-      if (sampleError) throw sampleError
+      if (sampleError) {
+        console.error(`[find-matches] sample ${key}:`, errorMessage(sampleError))
+        matches[key] = []
+        continue
+      }
 
       const cacheFresh =
         !!sample?.refreshed_at && new Date(sample.refreshed_at).getTime() >= staleCutoff
@@ -209,9 +243,6 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse({ source, matches })
   } catch (err) {
-    return jsonResponse(
-      { error: err instanceof Error ? err.message : String(err) },
-      502,
-    )
+    return jsonResponse({ error: errorMessage(err) }, 502)
   }
 })
